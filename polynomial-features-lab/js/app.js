@@ -1,16 +1,17 @@
 // Polynomial Features Lab: set the weights of a logistic regression by hand on
-// the raw features x₁, x₂ (and, at any point, on degree-2 polynomial terms),
+// the raw features x₁, x₂ (and, at any point, on polynomial terms of degree 2,
+// or degree 3 in the last challenges),
 // then reveal the best fit and compare. One screen: the original space (big),
 // a 2-D view of feature space with drag-and-drop axes, a relative-weights
 // chart, the controls, and the boundary equation pinned on top.
 
-import { CHALLENGES, TERMS, ALL, SPLIT, LAMBDA, W_MAX, featuresFor, compress, bestFit, scoreWeights, equationText, fitToRange } from './challenges.js';
+import { CHALLENGES, TERMS, ALL, STAGES, SPLIT, LAMBDA, wMax, stageDeg, featuresFor, compress, bestFit, scoreWeights, equationText, fitToRange, mapRegions } from './challenges.js';
 import { Scene, LIVE_SCENES } from './scene.js';
 import { XPlot, evalGrid, refreshTheme, theme, LIVE_PLOTS } from './plot2d.js';
 import { marchingSquares, chainSegments, classifyConic } from './geometry.js';
 import { h, tex, renderMath, fmt, pct, store, copyText, escapeHtml } from './ui.js';
 
-const SUB = '₀₁₂₃₄₅';
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
 const NT = TERMS.length;
 const EPS = 0.005; // below this a 2-decimal weight shows as 0.00
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -22,12 +23,13 @@ const SHAPES = { none: 'no boundary', empty: 'no boundary', point: 'a single poi
 
 // ---------- state (per challenge, saved in this browser) ----------
 
-// stage: which terms exist ('raw' = x₁, x₂; 'poly' = all five); include: the
-// user's subset; w: full [w0..w5]; touched and peeked (per stage: has this
-// attempt seen the best fit?) gate the "best by hand" record.
-const fresh = (c) => ({ stage: 'raw', include: ALL.slice(), w: c.start.slice(), revealed: false, peeked: { raw: false, poly: false }, touched: false, axes: [0, 1] });
+// stage: which terms exist (see STAGES: 'raw' = x₁, x₂; 'poly' = up to degree 2;
+// 'cubic' = up to degree 3); include: the user's subset; w: full [w0..w9];
+// touched and peeked (per stage: has this attempt seen the best fit?) gate the
+// "best by hand" record.
+const fresh = (c) => ({ stage: 'raw', include: ALL.slice(), w: c.start.slice(), revealed: false, peeked: { raw: false, poly: false, cubic: false }, touched: false, axes: [0, 1] });
 function valid(s) {
-  return !!s && (s.stage === 'raw' || s.stage === 'poly') && Array.isArray(s.include) && s.include.length === NT &&
+  return !!s && STAGES.some((st) => st.id === s.stage) && Array.isArray(s.include) && s.include.length === NT &&
     Array.isArray(s.w) && s.w.length === NT + 1 && s.w.every(Number.isFinite) &&
     Array.isArray(s.axes) && s.axes.length === 2 && s.axes[0] !== s.axes[1] && s.axes.every((k) => k >= 0 && k < NT);
 }
@@ -42,10 +44,10 @@ for (const c of CHALLENGES) {
 function opening(s) {
   s.stage = 'raw';
   s.revealed = false;
-  if (s.axes.some((k) => k > 1)) s.axes = [0, 1];
+  if (s.axes.some((k) => TERMS[k].deg > 1)) s.axes = [0, 1];
   return s;
 }
-// {id: {best, seen: {raw, poly}}}: best training accuracy by hand before seeing
+// {id: {best, seen: {raw, poly, cubic}}}: best training accuracy by hand before seeing
 // the best fit, and which stages' best fit the student has ever revealed.
 const progress = store('poly:progress') || {};
 const prog = (id = ch().id) => (progress[id] ||= { best: null });
@@ -60,8 +62,8 @@ if (idx < 0) idx = Math.max(0, indexOf(store('poly:last')));
 const ch = () => CHALLENGES[idx];
 let S = states[ch().id];
 
-const stageTerms = () => (S.stage === 'poly' ? [0, 1, 2, 3, 4] : [0, 1]);
-const activeMask = () => S.include.map((on, k) => (on && (S.stage === 'poly' || k < 2) ? 1 : 0));
+const stageTerms = () => TERMS.map((t, k) => k).filter((k) => TERMS[k].deg <= stageDeg(S.stage));
+const activeMask = () => S.include.map((on, k) => (on && TERMS[k].deg <= stageDeg(S.stage) ? 1 : 0));
 const effW = () => { const m = activeMask(); return S.w.map((v, k) => (k === 0 || m[k - 1] ? v : 0)); };
 
 let saveT = 0;
@@ -91,7 +93,9 @@ const prevBtn = h('button', { class: 'btn', type: 'button', title: 'Previous cha
 const nextBtn = h('button', { class: 'btn', type: 'button', title: 'Next challenge', 'aria-label': 'Next challenge' }, '›');
 const dots = h('div', { class: 'dots' });
 const dotBtns = CHALLENGES.map((c, i) => {
-  const b = h('button', { class: 'dot', type: 'button' }, String(i + 1));
+  // Extra-challenging ones get a ★ and are set apart by a thin divider.
+  if (c.hard && !(i > 0 && CHALLENGES[i - 1].hard)) dots.append(h('span', { class: 'dots-sep', 'aria-hidden': 'true' }));
+  const b = h('button', { class: `dot${c.hard ? ' hard' : ''}`, type: 'button' }, String(i + 1));
   b.addEventListener('click', () => switchTo(i));
   dots.append(b);
   return b;
@@ -102,7 +106,7 @@ const answersCount = h('span', { class: 'count' });
 const answersBtn = h('button', { class: 'icon-btn', type: 'button', title: 'Your submitted answers, ready to copy or screenshot' }, '📋', h('span', { class: 'lbl' }, ' My answers'), ' ', answersCount);
 const resetLabBtn = h('button', { class: 'icon-btn', type: 'button', title: 'Erase all progress in this browser and start the lab over', 'aria-label': 'Reset lab' }, '↺', h('span', { class: 'lbl' }, ' Reset lab'));
 const header = h('header', { class: 'app-header' },
-  h('div', { class: 'brand' }, 'Polynomial Features Lab', h('small', {}, 'IDS 705 · from x₁, x₂ to degree-2 features')),
+  h('div', { class: 'brand' }, 'Polynomial Features Lab', h('small', {}, 'IDS 705 · from x₁, x₂ to polynomial features')),
   h('nav', { class: 'stepper', 'aria-label': 'Challenges' }, prevBtn, dots, nextBtn),
   h('div', { class: 'spacer' }),
   answersBtn, resetLabBtn, themeBtn, helpBtn);
@@ -140,19 +144,14 @@ const xcard = h('section', { class: 'card plot-card xcard' },
 
 // ---------- feature-space view ----------
 
-const zchips = h('div', { class: 'zchips', role: 'group', 'aria-label': 'Features: drag one onto an axis' });
-const selH = h('select', { 'aria-label': 'Feature on the horizontal axis' });
-const selV = h('select', { 'aria-label': 'Feature on the vertical axis' });
-const slotH = h('label', { title: 'Horizontal axis' }, '→', selH);
-const slotV = h('label', { title: 'Vertical axis' }, '↑', selV);
-const swapBtn = h('button', { class: 'btn', type: 'button', title: 'Swap the axes' }, '⇄ swap');
+const zchips = h('div', { class: 'zchips', role: 'group', 'aria-label': 'Features: drag one onto an axis, or click it' });
+const swapBtn = h('button', { class: 'btn swap', type: 'button', title: 'Swap the axes' }, '⇄ swap');
 const zbox = h('div', { class: 'plot-box zbox' });
+const zwrap = h('div', { class: 'zwrap' }, zbox);
 const dropHint = h('div', { class: 'drop-hint', hidden: true });
-const zsub = h('span');
 const znote = h('div', { class: 'znote' });
 const zcard = h('section', { class: 'card plot-card zcard' },
-  h('div', { class: 'plot-title' }, h('b', {}, 'Feature space'), zsub),
-  zchips, h('div', { class: 'zaxes' }, slotH, slotV, swapBtn), h('div', { class: 'zwrap' }, zbox), znote);
+  h('div', { class: 'plot-title' }, h('b', {}, 'Feature space'), swapBtn), zchips, zwrap, znote);
 
 // ---------- relative-weights chart ----------
 
@@ -176,18 +175,22 @@ const wcard = h('section', { class: 'card plot-card wcard' },
 
 const kicker = h('span', { class: 'kicker' });
 const chName = h('h2', { class: 'ch-name' });
+const chHard = h('span', { class: 'hard-badge', title: 'Degree 3: up to nine features to balance by hand', hidden: true }, '★ Extra challenging');
 const chBrief = h('p', { class: 'ch-brief' });
 const chGoal = h('div', { class: 'ch-goal' });
 const chHintBody = h('p');
 const chHint = h('details', { class: 'ch-hint' }, h('summary', {}, 'Need a hint?'), chHintBody);
-const chCard = h('section', { class: 'card ch-card' }, kicker, chName, chBrief, chGoal, chHint);
+const chCard = h('section', { class: 'card ch-card' }, kicker, h('div', { class: 'ch-title' }, chName, chHard), chBrief, chGoal, chHint);
 
 // ---------- model card: features + weights ----------
 
-const segRaw = h('button', { type: 'button', title: 'Only the raw inputs', html: `Raw ${tex('x_1,\\ x_2')}` });
-const segPoly = h('button', { type: 'button', title: 'Add x₁², x₁x₂ and x₂²', html: 'Polynomial, degree 2' });
-segRaw.addEventListener('click', () => setStage('raw'));
-segPoly.addEventListener('click', () => setStage('poly'));
+// One button per feature set; a challenge shows those up to its maxDeg.
+const SEG_TITLES = { raw: 'Only the raw inputs', poly: 'Add x₁², x₁x₂ and x₂²', cubic: 'Add x₁³, x₁²x₂, x₁x₂² and x₂³ as well' };
+const segBtns = STAGES.map((st) => {
+  const b = h('button', { type: 'button', 'data-stage': st.id, title: SEG_TITLES[st.id] });
+  b.addEventListener('click', () => setStage(st.id));
+  return b;
+});
 const wrows = h('div', { class: 'wrows' });
 const ctl = [];
 for (let k = 0; k <= NT; k++) ctl.push(weightRow(k));
@@ -200,7 +203,7 @@ const nextChallengeBtn = h('button', { class: 'btn', type: 'button' }, 'Next cha
 nextChallengeBtn.addEventListener('click', () => switchTo(idx + 1));
 const statusEl = h('div', { class: 'status', hidden: true });
 const modelCard = h('section', { class: 'card model-card' },
-  h('div', { class: 'seg', role: 'group', 'aria-label': 'Features in the model' }, segRaw, segPoly),
+  h('div', { class: 'seg', role: 'group', 'aria-label': 'Features in the model' }, ...segBtns),
   h('div', { class: 'wrows-head' }, h('span', { title: 'Include this feature in the model' }, 'use'), h('span', {}, 'feature'), h('span', { title: 'Drag, type, or double-click a slider to set it to 0' }, 'weight'), flipBtn),
   wrows,
   h('div', { class: 'btn-row actions' }, submitBtn, revealBtn, resetBtn, nextChallengeBtn), statusEl);
@@ -210,8 +213,9 @@ function weightRow(k) {
   const name = bias ? 'bias' : TERMS[k - 1].label;
   const inc = bias ? h('span') : h('input', { type: 'checkbox', title: 'Include this feature in the model', 'aria-label': `Include ${name}` });
   const term = h('span', { class: 'wterm' }, h('span', { html: bias ? '<span class="nb">bias</span>' : tex(TERMS[k - 1].tex) }), h('span', { class: 'wname' }, `w${SUB[k]}`));
-  const range = h('input', { type: 'range', min: -W_MAX, max: W_MAX, step: 0.01, title: 'Double-click to set to 0', 'aria-label': `Weight w${SUB[k]} on ${name}` });
-  const num = h('input', { type: 'number', min: -W_MAX, max: W_MAX, step: 0.05, inputmode: 'decimal', 'aria-label': `Weight w${SUB[k]} on ${name}, exact value` });
+  const m = wMax(k); // degree-3 sliders span a smaller range for finer control
+  const range = h('input', { type: 'range', min: -m, max: m, step: 0.01, title: `Range ±${m}. Double-click to set to 0`, 'aria-label': `Weight w${SUB[k]} on ${name}` });
+  const num = h('input', { type: 'number', min: -m, max: m, step: m >= 5 ? 0.05 : 0.01, inputmode: 'decimal', 'aria-label': `Weight w${SUB[k]} on ${name}, exact value` });
   const row = h('div', { class: 'wrow', 'data-k': k }, inc, term, range, num);
   range.addEventListener('input', () => setWeight(k, +range.value, range));
   range.addEventListener('dblclick', () => setWeight(k, 0));
@@ -233,9 +237,10 @@ const useBtn = h('button', { class: 'btn', type: 'button', title: 'Put the best-
 const insightEl = h('div', { class: 'insight' });
 const compare = h('section', { class: 'card compare', hidden: true }, h('h2', {}, 'You vs. the best fit'), compareBody, h('div', { class: 'btn-row' }, useBtn), insightEl);
 
+const midCol = h('div', { class: 'col mid' }, zcard, wcard);
 root.append(header, eqbar, h('main', { class: 'workspace' },
   h('div', { class: 'col xcol' }, xcard),
-  h('div', { class: 'col mid' }, zcard, wcard),
+  midCol,
   h('div', { class: 'col side' }, chCard, modelCard, compare)));
 
 // ---------- plots + scene ----------
@@ -244,7 +249,7 @@ refreshTheme();
 const fitColor = () => getComputedStyle(document.documentElement).getPropertyValue('--fit').trim() || '#6a3fd0';
 let FIT = fitColor();
 const xplot = new XPlot(xbox, { outerLabels: true });
-const zplot = new XPlot(zbox, { outerLabels: true });
+const zplot = new XPlot(zbox, { outerLabels: { L: 46, B: 36 } }); // slimmer margins: this plot is small
 zbox.append(dropHint);
 const scene = new Scene({ plot: xplot, cfg: (() => { const c = { view: { showTest: false, mistakes: view.mistakes, shade: view.shade } }; challengeCfg(c); return c; })(), onFrame });
 scene.overlays = [(c, plot) => { const b = currentBest(); if (b) plot.drawSegs(b.segs, b.G, { color: FIT, width: 2.4, dash: [9, 6], halo: true }); }];
@@ -287,9 +292,12 @@ function eqHtml(w, mask, labels) {
   return `${s}<span class="op">=</span><span class="term">${tex('0')}</span>`;
 }
 function updateEquation(b) {
-  const html = eqHtml(S.w, activeMask(), true);
+  const html = eqHtml(S.w, activeMask(), true), long = activeMask().reduce((s, v) => s + v, 0) > 5;
   if (html !== lastEq) { eqYou.innerHTML = html; lastEq = html; applyHighlight(); }
-  const c = classifyConic(effW());
+  eqYou.classList.toggle('long', long);
+  eqFit.classList.toggle('long', long);
+  const w = effW(), cubic = w.slice(6).some((v) => Math.abs(v) >= EPS);
+  const c = cubic ? { name: 'cubic curve', detail: 'A degree-3 boundary: it can bend more than once' } : classifyConic(w.slice(0, 6));
   shapeEl.innerHTML = `shape: <b>${SHAPES[c.name] || c.name}</b>`;
   shapeEl.title = c.detail;
   if (b) {
@@ -332,11 +340,12 @@ function updateBars(b) {
     r.val.innerHTML = on(k) ? `<span>${signed2(w[k])}</span>${b ? `<span class="bf">${signed2(b.w[k])}</span>` : ''}` : 'not used';
   });
   wLegendBest.hidden = !b;
+  wbars.classList.toggle('many', terms.length > 5); // degree 3: ten rows, packed tighter
 }
 
 // ---------- feature-space view ----------
 
-let zc = { key: '' };
+let zc = { key: '' }, zRegions = { src: null, key: '' };
 function renderZ(sc, b) {
   const [a, c] = S.axes, tr = sc.split.train, N = tr.y.length;
   const key = `${ch().id}|${a}|${c}`;
@@ -361,9 +370,13 @@ function renderZ(sc, b) {
     }
     return { G, V };
   };
-  // Exact: shade the plane and draw the full line. Otherwise map the boundary
-  // traced in the original space into this plane, point by point.
+  // Exact: shade the plane and draw the full line. Otherwise carry the regions
+  // and the boundary traced in the original space into this plane, point by point.
   const oth = others(w), grid = oth.length ? null : plane(w);
+  if (!grid && (zRegions.src !== sc.grid || zRegions.key !== key)) {
+    zRegions = { src: sc.grid, key, g: mapRegions(sc.grid, sc.displayView(), a, c, zc.view) };
+  }
+  const shading = grid || zRegions.g;
   const bGrid = b && !others(b.w).length ? plane(b.w) : null;
   const bSegs = bGrid ? marchingSquares(bGrid.V, bGrid.G) : null;
   const xv = sc.displayView();
@@ -374,7 +387,7 @@ function renderZ(sc, b) {
   zplot.onHover = (u, v, near) => `${TERMS[a].label} = ${fmt(u)}<br>${TERMS[c].label} = ${fmt(v)}${near ? `<div class="sep"></div>training point, class <b>${near.label ? 'orange' : 'blue'}</b>` : ''}`;
   const ySegs = grid ? marchingSquares(grid.V, grid.G) : null;
   zplot.render({
-    grid, shade: view.shade,
+    grid: shading, shade: view.shade,
     points: [{ X: zc.X, y: tr.y, name: 'training', mistakes: view.mistakes ? sc.mistakes('train') : null }],
     // Boundaries go over the points: in feature space the points often pile up right on them.
     overlays: [
@@ -386,11 +399,13 @@ function renderZ(sc, b) {
   });
   zc.drawn = grid ? 'line' : youLines.length; // for the smoke test
   const d = mask.reduce((s, v) => s + v, 0), lab = (k) => TERMS[k].label;
-  zsub.textContent = `2 of ${stageTerms().length} features`;
   let note;
   if (S.stage === 'raw' && a + c === 1) note = 'With raw features, feature space is the original space, so your boundary is the same line.';
   else if (!oth.length) note = 'Every other feature has weight 0, so here your boundary is exactly a <b>straight line</b>.';
-  else note = `Your boundary, carried over from the original space. It bends here because ${oth.map(lab).join(', ')} also ${oth.length === 1 ? 'has' : 'have'} weight; across all ${d} features it is one flat plane.`;
+  else {
+    const who = oth.length <= 2 ? `${oth.map(lab).join(' and ')} also ${oth.length === 1 ? 'has' : 'have'}` : `${oth.length} other features also have`;
+    note = `Colors and boundary carried over from the original space; they bend because ${who} weight (in all ${d} features the boundary is flat).`;
+  }
   const missing = [a, c].filter((k) => !mask[k]);
   if (missing.length) note += ` <i>${missing.map(lab).join(' and ')} ${missing.length === 1 ? 'is' : 'are'} not in your model.</i>`;
   if (znote.innerHTML !== note) { znote.innerHTML = note; znote.title = znote.textContent; }
@@ -435,14 +450,7 @@ function syncZControls() {
     bindChip(chip, k);
     zchips.append(chip);
   }
-  for (const [sel, ax] of [[selH, 0], [selV, 1]]) {
-    sel.innerHTML = '';
-    for (const k of terms) sel.append(h('option', { value: String(k) }, TERMS[k].label));
-    sel.value = String(S.axes[ax]);
-  }
 }
-selH.addEventListener('change', () => assignAxis(+selH.value, 0));
-selV.addEventListener('change', () => assignAxis(+selV.value, 1));
 swapBtn.addEventListener('click', () => { S.axes = [S.axes[1], S.axes[0]]; axesChanged(); });
 
 function assignAxis(k, ax) {
@@ -496,15 +504,11 @@ function bindChip(chip, k) {
 }
 function dropTarget(x, y) {
   const hit = (el) => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom ? r : null; };
-  if (hit(slotH)) return 0;
-  if (hit(slotV)) return 1;
   const r = hit(zbox);
   if (!r) return null;
   return (x - r.left) / r.width + (y - r.top) / r.height > 1 ? 0 : 1;
 }
 function showTarget(t, ghost = null) {
-  slotH.classList.toggle('drop-on', t === 0);
-  slotV.classList.toggle('drop-on', t === 1);
   dropHint.hidden = t === null;
   if (t !== null) { dropHint.className = `drop-hint ${t === 0 ? 'h' : 'v'}`; dropHint.textContent = t === 0 ? 'horizontal axis' : 'vertical axis'; }
   if (ghost) ghost.querySelector('.to').textContent = t === 0 ? '→ horizontal' : t === 1 ? '↑ vertical' : '';
@@ -577,7 +581,7 @@ function track(sc) {
 // ---------- updates ----------
 
 function setWeight(k, v, src = null) {
-  v = round2(clamp(v, -W_MAX, W_MAX));
+  v = round2(clamp(v, -wMax(k), wMax(k)));
   S.w[k] = v;
   S.touched = true;
   if (src !== ctl[k].range) ctl[k].range.value = String(v);
@@ -591,7 +595,7 @@ function setStage(stage) {
   if (S.stage === stage) return;
   S.stage = stage;
   S.touched = true;
-  if (stage === 'raw' && S.axes.some((k) => k > 1)) S.axes = [0, 1];
+  if (S.axes.some((k) => TERMS[k].deg > stageDeg(stage))) S.axes = [0, 1];
   featuresChanged();
 }
 // A shown best fit belonged to the old features; hide it so it does not give
@@ -612,8 +616,13 @@ function stateChanged() {
 }
 
 function syncControls() {
-  segRaw.setAttribute('aria-pressed', String(S.stage === 'raw'));
-  segPoly.setAttribute('aria-pressed', String(S.stage === 'poly'));
+  const three = ch().maxDeg >= 3;
+  segBtns.forEach((b, i) => {
+    const st = STAGES[i];
+    b.hidden = st.deg > ch().maxDeg;
+    b.innerHTML = st.id === 'raw' ? `Raw ${tex('x_1,\\ x_2')}` : three ? `Degree ${st.deg}` : 'Polynomial, degree 2';
+    b.setAttribute('aria-pressed', String(S.stage === st.id));
+  });
   const terms = stageTerms();
   ctl.forEach((c, k) => {
     const on = k === 0 || !!S.include[k - 1];
@@ -648,13 +657,14 @@ function syncDots() {
     const c = CHALLENGES[i], p = progress[c.id], met = !!(p && p.best != null && p.best >= c.goal - 1e-9);
     btn.setAttribute('aria-current', String(i === idx));
     btn.classList.toggle('met', met);
-    btn.title = `${i + 1}. ${c.name}${met ? ' (goal reached)' : ''}`;
+    btn.title = `${i + 1}. ${c.name}${c.hard ? ' (extra challenging)' : ''}${met ? ' (goal reached)' : ''}`;
   });
 }
 function syncChallenge() {
   const c = ch();
   kicker.textContent = `Challenge ${idx + 1} of ${CHALLENGES.length}`;
   chName.textContent = c.name;
+  chHard.hidden = !c.hard;
   chBrief.innerHTML = c.brief;
   chHintBody.innerHTML = c.hint;
   chHint.open = false;
@@ -875,12 +885,12 @@ const HELP = `
 <p>The model is <b>logistic regression</b>: \\(P(\\text{orange}\\mid x) = \\sigma(w_0 + w_1z_1 + \\dots + w_dz_d)\\). The features \\(z\\) are the raw inputs \\(x_1, x_2\\) or, once you switch, the degree-2 terms \\(x_1, x_2, x_1^2, x_1x_2, x_2^2\\). The boundary is where \\(w_0 + w^\\top z = 0\\); the bar at the top always shows yours.</p>
 <ol>
   <li><b>Set the weights by hand.</b> Drag the sliders or type values to get the highest <b>training accuracy</b> you can. Ringed points are the ones your boundary gets wrong.</li>
-  <li><b>Add polynomial features</b> at any time with <i>Polynomial, degree 2</i>. Untick terms to use only some of them. Each challenge opens on the raw features with the best fit hidden; your polynomial weights are kept for when you switch back.</li>
+  <li><b>Add polynomial features</b> at any time with <i>Polynomial, degree 2</i> (challenges 8 and 9, marked ★, are extra challenging: they also offer <i>Degree 3</i>, \\(x_1^3, x_1^2x_2, x_1x_2^2, x_2^3\\), whose sliders have a finer ±1 range because cubes grow fast). Untick terms to use only some of them. Each challenge opens on the raw features with the best fit hidden; your polynomial weights are kept for when you switch back.</li>
   <li><b>Submit your answer.</b> It goes into <b>📋 My answers</b> (top right): a table you can copy into a document or screenshot. Submitting again replaces it.</li>
   <li><b>Reveal the best fit</b> when you have done what you can: the weights with the lowest cross-entropy on the training points. Its boundary appears as a dashed violet line, with its equation, accuracy and weights next to yours. Changing the features hides it again, so it never gives away the answer for features you have not tried yet.</li>
   <li><b>Next challenge</b> moves on; <b>Reset</b> starts this one over (and can be undone for a few seconds). <b>Reset lab</b> (top right) erases all your progress and submitted answers in this browser and starts the whole lab over, after asking you to confirm.</li>
 </ol>
-<p><b>Feature space</b> plots the training points against any two features. Drag a feature chip onto the plot (lower-right half: horizontal axis; upper-left half: vertical axis), click a chip, or use the axis menus. Your boundary is always drawn, carried over from the original space. It is a straight line exactly when every other feature has weight 0.</p>
+<p><b>Feature space</b> plots the training points against any two features. Drag a feature chip onto the plot (lower-right half: horizontal axis; upper-left half: vertical axis), or click a chip and choose an axis; <i>⇄ swap</i> exchanges them. Your boundary is always drawn, carried over from the original space; it is a straight line exactly when every other feature has weight 0. The shading shows the class your model predicts for the original points that land at each spot: blank where none land, pale where points of both predicted classes land together.</p>
 <p><b>Relative weights</b> divides each set of weights by its largest one. Only the ratios between weights place the boundary: multiplying them all by the same positive number keeps the boundary and only makes the probabilities sharper.</p>
 <p class="hint">Hover a slider to highlight its term in the equation. Double-click a slider to set it to 0. Progress is saved in this browser.</p>`;
 function showHelp() {
@@ -905,6 +915,28 @@ document.addEventListener('keydown', (e) => {
 // Keep the sticky controls column below the equation bar on scrolling layouts.
 new ResizeObserver(() => document.documentElement.style.setProperty('--eqbar-h', `${eqbar.offsetHeight}px`)).observe(eqbar);
 
+// One-screen layout: give the feature-space plot whatever height its column
+// has left (up to square), but never less than Z_MIN so it stays readable;
+// below that the column scrolls rather than squeezing or overlapping.
+const Z_MIN = 220;
+const oneScreen = window.matchMedia('(min-width: 1100px) and (min-height: 600px)');
+function fitZ() {
+  if (!oneScreen.matches) { zwrap.style.height = ''; return; }
+  const rest = zcard.offsetHeight - zwrap.offsetHeight; // title, chips, note, padding
+  const gap = parseFloat(getComputedStyle(midCol).rowGap) || 0;
+  const room = Math.floor(midCol.clientHeight - wcard.offsetHeight - gap - rest);
+  // The widest square the column allows, measured including any scrollbar so
+  // that a scrollbar appearing or disappearing cannot change the answer.
+  const maxW = midCol.offsetWidth - (zcard.offsetWidth - zwrap.clientWidth);
+  const size = Math.max(Z_MIN, Math.min(maxW, room));
+  if (Math.abs(zwrap.offsetHeight - size) > 1) zwrap.style.height = `${size}px`;
+}
+// Resize on the next frame, outside the observer callback (no resize loops).
+let zFitFrame = 0;
+const zFitter = new ResizeObserver(() => { cancelAnimationFrame(zFitFrame); zFitFrame = requestAnimationFrame(fitZ); });
+[midCol, wcard, zchips, znote].forEach((el) => zFitter.observe(el));
+oneScreen.addEventListener('change', fitZ);
+
 // ---------- boot ----------
 
 if (location.hash.slice(1) !== ch().id) history.replaceState(null, '', `#${ch().id}`);
@@ -918,5 +950,5 @@ if (!store('poly:helpSeen')) { store('poly:helpSeen', true); showHelp(); }
 // for the console and tests
 window.polylab = {
   scene, zplot, challenges: CHALLENGES, answers, get state() { return S; }, get zDrawn() { return zc.drawn; },
-  switchTo, setWeight, setStage, setInclude, assignAxis, showAnswers,
+  switchTo, setWeight, setStage, setInclude, assignAxis, showAnswers, fitZ,
 };

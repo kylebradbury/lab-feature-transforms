@@ -124,6 +124,21 @@ export const DATASETS = {
       });
     },
   },
+  cubic: {
+    label: 'S-curve (cubic)',
+    params: {
+      noise: NOISE(0.05),
+      a: { min: -1, max: 1, step: 0.05, default: 0.4, label: 'cubic a' },
+      b: { min: -3, max: 3, step: 0.05, default: -1.8, label: 'slope b' },
+      c: { min: -2, max: 2, step: 0.05, default: 0, label: 'offset c' },
+    },
+    gen(n, p, rng) {
+      return region(n, rng, (x, y) => {
+        const d = y - (p.a * x ** 3 + p.b * x + p.c);
+        return near(d, 0.15) ? -1 : d > 0 ? 1 : 0;
+      });
+    },
+  },
   xor: {
     label: 'XOR quadrants',
     params: {

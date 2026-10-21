@@ -77,7 +77,7 @@ export class XPlot {
     this.box = box;
     this.thumb = thumb;
     this.axisLabels = axisLabels;
-    this.outerLabels = outerLabels; // axis titles outside the plot area instead of in its corners
+    this.outerLabels = outerLabels; // axis titles outside the plot area instead of in its corners; may be {L, B} margins
     this.canvas = h('canvas', { role: 'img', 'aria-label': 'Decision regions plot' });
     this.ctx = this.canvas.getContext('2d');
     this.heat = document.createElement('canvas');
@@ -108,7 +108,7 @@ export class XPlot {
 
   get rect() {
     if (this.thumb) return { L: 0, T: 0, W: this.cssW, H: this.cssH };
-    const L = this.outerLabels ? 54 : 38, B = this.outerLabels ? 42 : 28, T = 8, R = 10;
+    const o = this.outerLabels, L = o ? o.L ?? 54 : 38, B = o ? o.B ?? 42 : 28, T = 8, R = 10;
     return { L, T, W: this.cssW - L - R, H: this.cssH - T - B };
   }
   tx(x) { return this.xlog ? Math.log(x) : x; }
@@ -190,8 +190,8 @@ export class XPlot {
       // axis titles in the margins: centered under the x ticks, rotated left of the y ticks
       c.fillStyle = T.ink; c.font = 'italic 14px system-ui, sans-serif';
       c.textAlign = 'center'; c.textBaseline = 'top';
-      c.fillText(xl, L + W / 2, top + H + 21);
-      c.save(); c.translate(13, top + H / 2); c.rotate(-Math.PI / 2); c.textBaseline = 'middle';
+      c.fillText(xl, L + W / 2, top + H + 19);
+      c.save(); c.translate(Math.max(9, L - 41), top + H / 2); c.rotate(-Math.PI / 2); c.textBaseline = 'middle';
       c.fillText(yl, 0, 0);
       c.restore();
       return;

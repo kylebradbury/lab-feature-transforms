@@ -6,8 +6,9 @@
 // page reloads and must look like a first visit). Records any error and
 // restores the lab's saved progress afterwards.
 // ?shot=<challenge id> ends in a showcase state on that challenge (screenshots);
-// add &poly=0 to stay on raw features, &reveal=0 to keep the best fit hidden,
-// and &answers=1 to finish with the answers table open.
+// add &poly=0 to stay on raw features (or &stage=cubic for degree 3, with
+// &w=w0,w1,... for its weights), &reveal=0 to keep the best fit hidden, and
+// &answers=1 to finish with the answers table open.
 const frame = document.getElementById('app');
 const out = document.getElementById('summary');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,7 +50,10 @@ frame.addEventListener('load', async () => {
     chip.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     await sleep(120);
   }
-  const chip = (k) => doc.querySelectorAll('.zchips .zchip')[k]; // chips follow the term order x₁, x₂, x₁², x₁x₂, x₂²
+  const chip = (k) => doc.querySelectorAll('.zchips .zchip')[k]; // chips follow the term order x₁, x₂, x₁², x₁x₂, x₂², …
+  const stageBtn = (id) => doc.querySelector(`.seg button[data-stage="${id}"]`);
+  const STAGE_FOR = [null, 'raw', 'poly', 'cubic']; // by challenge.need
+  const TERMS_UPTO = [0, 2, 5, 9]; // number of terms up to each degree
 
   // Restore the saved progress, optionally set up a screenshot, report.
   async function finish() {
@@ -62,13 +66,18 @@ frame.addEventListener('load', async () => {
       await sleep(100);
       btn(/^↺ Reset$/).click();
       if (params.get('poly') !== '0') {
-        btn(/Polynomial/).click();
-        [1.4, 0.2, 0, -0.8, 0, -1].forEach((v, k) => app.setWeight(k, v));
-        app.assignAxis(2, 0); app.assignAxis(4, 1);
+        stageBtn(params.get('stage') || 'poly').click();
+        (params.get('w') ? params.get('w').split(',').map(Number) : [1.4, 0.2, 0, -0.8, 0, -1]).forEach((v, k) => app.setWeight(k, v));
+        if (!params.get('w')) { app.assignAxis(2, 0); app.assignAxis(4, 1); }
       }
       if (params.get('reveal') !== '0') btn(/Reveal best fit/).click();
       await sleep(400);
+      app.fitZ(); await sleep(60);
+      log.push(`shot ${shot}: feature-space plot ${Math.round(doc.querySelector('.zbox').getBoundingClientRect().height)}px, column ${doc.querySelector('.col.mid').clientHeight}px`);
       if (params.get('answers') === '1') app.showAnswers();
+      // Headless screenshots re-lay out the page briefly while capturing; stop
+      // further frames so that transient size cannot resize the plots.
+      w.requestAnimationFrame = () => 0;
       restore();
       out.hidden = true;
       document.body.classList.add('shot');
@@ -101,8 +110,11 @@ frame.addEventListener('load', async () => {
     btn(/^↺ Reset$/).click();
     await sleep(150);
     const startAcc = acc('.accbox .big');
-    if (c.poly) btn(/Polynomial/).click();
+    check(stageBtn('cubic').hidden === (c.maxDeg < 3), `degree-3 option ${c.maxDeg < 3 ? 'shown' : 'missing'}`);
+    check(doc.querySelector('.hard-badge').hidden === !c.hard && doc.querySelectorAll('.dot')[i].classList.contains('hard') === !!c.hard, 'extra-challenging marker on the wrong challenges');
+    stageBtn(STAGE_FOR[c.need]).click();
     await sleep(80);
+    if (c.need === 3) check(doc.querySelector('.wrow[data-k="6"] input[type=range]').max === '1', 'cubic slider range is not ±1');
     c.hand.forEach((v, k) => {
       const input = doc.querySelector(`.wrow[data-k="${k}"] input[type=range]`);
       if (input.closest('.wrow').hidden) return;
@@ -113,8 +125,15 @@ frame.addEventListener('load', async () => {
     const handAcc = acc('.accbox .big');
     check(handAcc >= 100 * c.goal - 0.05, `hand solution ${handAcc}% below goal ${100 * c.goal}%`);
     check(doc.querySelector('.accbox .goal').classList.contains('met'), 'goal not shown as met');
-    check(doc.querySelectorAll('.eq-main .term[data-k]').length === (c.poly ? 6 : 3), 'equation term count');
-    check(c.poly ? app.zDrawn > 0 : app.zDrawn === 'line', `feature-space boundary not drawn (${app.zDrawn})`);
+    check(doc.querySelectorAll('.eq-main .term[data-k]').length === 1 + TERMS_UPTO[c.need], 'equation term count');
+    check(c.need > 1 ? app.zDrawn > 0 : app.zDrawn === 'line', `feature-space boundary not drawn (${app.zDrawn})`);
+    // the feature-space plot stays readable and its note stays inside the card
+    app.fitZ(); await sleep(60);
+    const zr = doc.querySelector('.zbox').getBoundingClientRect(), cr = doc.querySelector('.zcard').getBoundingClientRect();
+    check(zr.height >= 210, `feature-space plot only ${Math.round(zr.height)}px tall`);
+    const zg = app.zplot.data && app.zplot.data.grid, shaded = zg ? Array.from(zg.V).filter(Number.isFinite).length / zg.V.length : 0;
+    check(shaded > 0.1, `feature-space plot shaded on only ${(100 * shaded).toFixed(0)}% of its area`);
+    check(doc.querySelector('.znote').getBoundingClientRect().bottom <= cr.bottom + 0.5, 'feature-space note overflows its card');
 
     // submit the hand solution
     btn(/Submit answer/).click();
@@ -127,7 +146,7 @@ frame.addEventListener('load', async () => {
     const zb = doc.querySelector('.zbox');
     await drag(chip(1), zb, 0.85, 0.85);
     check(app.state.axes[0] === 1 && app.state.axes[1] === 0, `drag to horizontal gave axes ${app.state.axes}`);
-    if (c.poly) {
+    if (c.need > 1) {
       await drag(chip(4), zb, 0.1, 0.1);
       check(app.state.axes[1] === 4, `drag x₂² to vertical gave axes ${app.state.axes}`);
       chip(2).click();
@@ -153,15 +172,14 @@ frame.addEventListener('load', async () => {
     const copied = acc('.accbox .big');
     check(Math.abs(copied - bestAcc) <= 2.01, `copied best fit ${copied}% vs best ${bestAcc}%`);
     // changing the features hides the best fit (no spoilers for the new features)
-    const other = c.poly ? /^Raw/ : /Polynomial/, back = c.poly ? /Polynomial/ : /^Raw/;
-    btn(other).click(); await sleep(120);
+    stageBtn(c.need > 1 ? 'raw' : 'poly').click(); await sleep(120);
     check(!app.state.revealed && doc.querySelector('.eqrow.fit').hidden && doc.querySelector('.compare').hidden, 'best fit still shown after changing features');
-    btn(back).click(); await sleep(120);
+    stageBtn(STAGE_FOR[c.need]).click(); await sleep(120);
 
     // untick and re-tick a term, then reset + undo
     const box = doc.querySelector('.wrow[data-k="1"] input[type=checkbox]');
     box.click(); await sleep(80);
-    check(doc.querySelectorAll('.eq-main .term[data-k]').length === (c.poly ? 5 : 2), 'unticked term still in equation');
+    check(doc.querySelectorAll('.eq-main .term[data-k]').length === TERMS_UPTO[c.need], 'unticked term still in equation');
     box.click(); await sleep(80);
     const before = JSON.stringify(app.state.w);
     btn(/^↺ Reset$/).click(); await sleep(150);
@@ -175,10 +193,10 @@ frame.addEventListener('load', async () => {
   // reopening a challenge: raw features, best fit hidden, polynomial weights kept
   current = 'reopen';
   app.switchTo(2); await sleep(100);
-  btn(/Polynomial/).click(); app.setWeight(3, -0.7); btn(/Reveal best fit/).click(); await sleep(150);
+  stageBtn('poly').click(); app.setWeight(3, -0.7); btn(/Reveal best fit/).click(); await sleep(150);
   app.switchTo(3); await sleep(100); app.switchTo(2); await sleep(150);
   check(app.state.stage === 'raw' && !app.state.revealed && doc.querySelector('.eqrow.fit').hidden, `reopened on ${app.state.stage}, revealed ${app.state.revealed}`);
-  btn(/Polynomial/).click(); await sleep(80);
+  stageBtn('poly').click(); await sleep(80);
   check(app.state.w[3] === -0.7 && !app.state.revealed, 'polynomial weights not kept');
 
   // next challenge button
