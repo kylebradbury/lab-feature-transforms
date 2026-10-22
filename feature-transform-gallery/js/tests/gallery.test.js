@@ -3,7 +3,7 @@
 // claim in the exhibit text and the finale holds on the real data and fits.
 
 import { suite, test, assert } from './harness.js';
-import { EXHIBITS, MATCH, byId, bumpParts, hingeParts, binParts } from '../exhibits.js';
+import { EXHIBITS, MATCH, byId, bumpParts, hingeParts, binParts, sinMultiple } from '../exhibits.js';
 import { fitCase, exhibitCase, geometry, shownWeights } from '../build.js';
 
 suite('content');
@@ -58,7 +58,7 @@ test('checkerboard: one cut at 0', () => {
   assert(Math.abs(v[0]) < 0.15, `w₀/w₁ = ${v[0].toFixed(2)}`);
 });
 test('feature counts named in the text: 9 (degree 3), 49 bumps, 60 hinges', () => {
-  assert(fitOf('poly3').model.d === 9 && fitOf('bumps').model.d === 49 && fitOf('relu').model.d === 60, 'feature count');
+  assert(fitOf('poly3').model.d === 9 && fitOf('rbf').model.d === 49 && fitOf('relu').model.d === 60, 'feature count');
 });
 test('poly3: degree 1 is the raw features again', () => {
   const fc = fitOf('poly3', { deg: 1 });
@@ -75,7 +75,7 @@ for (const [id, key, ks] of [['flower', 'k', [2, 3, 4, 5, 6, 7, 8]], ['spiral', 
 
 // ---- definitions and written-out features ----
 test('every exhibit with a parameter inside Φ says it was chosen by hand', () => {
-  const want = ['circle', 'parabola', 'ring', 'flower', 'spiral', 'wedge', 'wave', 'checker', 'diamond', 'islands', 'bumps', 'relu', 'bins'];
+  const want = ['circle', 'parabola', 'ring', 'flower', 'spiral', 'wedge', 'wave', 'checker', 'diamond', 'islands', 'rbf', 'relu', 'bins'];
   for (const id of want) { const ex = byId(id); assert(ex.chosen && ex.chosen(ex.k0).length > 40, `${id}: no hand-chosen note`); }
   for (const ex of EXHIBITS) if (ex.knobs) assert(ex.chosen, `${ex.id} has a knob but no hand-chosen note`);
 });
@@ -102,11 +102,11 @@ test('hinges written out as max(0, a·x₁ + b·x₂ + c) match the features', (
   }
 });
 test('bumps written out with their landmarks and γ match the features', () => {
-  for (const fc of [fitOf('bumps', { m: 3 }), fitOf('bumps'), fitOf('islands')]) {
+  for (const fc of [fitOf('rbf', { m: 3 }), fitOf('rbf'), fitOf('islands')]) {
     const { gamma, centers } = bumpParts(fc);
     sameAsFeatures(fc, (j, x1, x2) => Math.exp(-gamma * ((x1 - centers[j][0]) ** 2 + (x2 - centers[j][1]) ** 2)));
   }
-  assert(fitOf('bumps', { m: 3 }).model.d === 9, 'a 3 × 3 grid has 9 bumps');
+  assert(fitOf('rbf', { m: 3 }).model.d === 9, 'a 3 × 3 grid has 9 bumps');
 });
 test('bins written out as 𝟙[lo ≤ xᵢ < hi] match the features', () => {
   for (const B of [2, 6, 14]) {
@@ -114,6 +114,21 @@ test('bins written out as 𝟙[lo ≤ xᵢ < hi] match the features', () => {
     assert(P.length === 2 * (B - 1), `${P.length} bins for B = ${B}`);
     sameAsFeatures(fc, (j, x1, x2) => { const v = P[j].axis === 1 ? x1 : x2; return v >= P[j].lo && (P[j].hi === null || v < P[j].hi) ? 1 : 0; });
   }
+});
+
+test('sin kθ written in c = x₁/r and s = x₂/r equals sin kθ', () => {
+  // parse "5c^4s - 10c^2s^3 + s^5" into terms and evaluate it
+  const evalPoly = (str, c, s) => str.split(/\s(?=[+-]\s)/).reduce((sum, term) => {
+    const m = term.replace(/\s/g, '').match(/^([+-]?)(\d*)(?:c(?:\^(\d))?)?(?:s(?:\^(\d))?)?$/);
+    assert(m, `cannot read term "${term}"`);
+    const ce = /c/.test(term) ? +(m[3] || 1) : 0, se = /s/.test(term) ? +(m[4] || 1) : 0;
+    return sum + (m[1] === '-' ? -1 : 1) * (m[2] ? +m[2] : 1) * c ** ce * s ** se;
+  }, 0);
+  for (let k = 1; k <= 8; k++) for (const t of [0.3, 1.1, 2.5, -0.7, 3]) {
+    const v = evalPoly(sinMultiple(k), Math.cos(t), Math.sin(t));
+    assert(Math.abs(v - Math.sin(k * t)) < 1e-9, `k = ${k}, θ = ${t}: ${sinMultiple(k)} gives ${v}, sin kθ = ${Math.sin(k * t)}`);
+  }
+  return `k = 5: ${sinMultiple(5)}`;
 });
 
 // ---- finale ----

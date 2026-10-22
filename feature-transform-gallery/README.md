@@ -27,13 +27,13 @@ python3 -m http.server 8000
 | Page | What it shows |
 |---|---|
 | `#` (the hall) | Every exhibit as a live tile. Hover over a tile to apply its Φ; **Apply every Φ** straightens all of them at once. |
-| `#<id>`, e.g. `#spiral` | One exhibit: the morph, Φ with definitions of every function in it, the boundary equation in feature space and in x, and test accuracy with the raw features vs. with Φ. Some exhibits have knobs, e.g. the number of turns the spiral feature assumes, or the number and width of the bumps. With 10 features or fewer, every feature is written out with its fitted numbers (hinges, landmarks, bin edges). The plot stays on screen while the text scrolls. |
-| `#match` (the finale) | 7 representations × 6 datasets. Each dataset is cracked by its own Φ and not by the others. A generic Φ (49 bumps) does well almost everywhere, but needs 49 features. |
+| `#<id>`, e.g. `#spiral` | One exhibit: the morph, Φ with definitions of every function in it, the boundary equation in feature space and in x, and test accuracy with the raw features vs. with Φ. Some exhibits have knobs, e.g. the number of turns the spiral feature assumes, or the number and width of the RBFs. With 10 features or fewer, every feature is written out with its fitted numbers (ReLU units, RBF centers, bin edges). The plot stays on screen while the text scrolls. |
+| `#match` (the finale) | 7 representations × 6 datasets. Each dataset is cracked by its own Φ and not by the others. A basis expansion (49 radial basis functions) does well almost everywhere, but needs 49 features. |
 
 **Designed features:** line, circle, parabola, hyperbola, ring, flower, spiral, wedge, wave,
 checkerboard, diamond, corner, power law, islands.
 
-**Generic features:** polynomial (degree 3), RBF bumps, random ReLU hinges, bins.
+**Basis expansions:** polynomial (degree 3), radial basis functions (RBF), random ReLU (rectified linear unit) features, bins.
 
 **Keys on an exhibit:**
 
@@ -71,7 +71,7 @@ Add an entry to `EXHIBITS` in `js/exhibits.js`. Copy a similar one and give it:
 - `phi` (TeX)
 - `defs(k)`: a definition of every function and symbol in Φ
 - `zAxis(k)` (axis names, when there are one or two features)
-- the text: `lead`, `how`, `practice`
+- the text: `lead`, `how`
 - optionally `knobs`, and `terms(fc, k)` to write each feature out with its fitted numbers
 
 Then run the tests. They check that every exhibit beats the straight line on new data, and that

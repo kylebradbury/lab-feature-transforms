@@ -94,11 +94,11 @@ frame.addEventListener('load', async () => {
     const t = params.has('t') ? +params.get('t') : null;
     if (app.plot) {
       if (params.has('k')) { params.get('k').split(',').forEach((kv) => { const [key, v] = kv.split(':'); app.setKnob(key, +v); }); await sleep(300); }
-      if (params.has('scroll')) { w.scrollTo(0, +params.get('scroll')); await sleep(100); }
       if (params.get('raw') === '1') app.setView({ rawLine: true });
       if (t !== null) await setT(t);
       if (params.has('hover')) { const [x, y] = pointAt(app.plot, +params.get('hover')); app.plot.canvas.dispatchEvent(pe('pointermove', x, y)); }
     } else if (t !== null) app.live.forEach((p) => p.setT(t));
+    if (params.has('scroll')) { w.scrollTo(0, +params.get('scroll')); await sleep(100); }
     await sleep(200);
     w.requestAnimationFrame = () => 0; // freeze: a resize during capture must not redraw mid-state
     restore();
@@ -118,6 +118,12 @@ frame.addEventListener('load', async () => {
   check(app.live.every((p) => p.g), 'a tile has no plot');
   check(doc.querySelectorAll('.tile-phi .katex').length === tiles.length, 'Φ not typeset on every tile');
   const badge = (p) => p.badge.dataset.space;
+  const foot = () => doc.querySelector('footer.site-foot');
+  check(foot() && foot().querySelector('a[href="https://kylebradbury.com/"]') && /Designed by Kyle Bradbury, built with Claude/.test(foot().textContent) && /©/.test(foot().textContent), 'no copyright footer');
+  check(tiles.every((t) => t.querySelector('.fam').getBoundingClientRect().right <= t.getBoundingClientRect().right + 0.5), 'a family name runs out of its tile');
+  const phiCut = tiles.filter((t) => { const k = t.querySelector('.tile-phi .katex'), c = t.querySelector('.tile-phi'); return k.getBoundingClientRect().right > c.getBoundingClientRect().right + 1; });
+  check(!phiCut.length, `Φ does not fit on the tile: ${phiCut.map((t) => t.dataset.id).join(', ')}`);
+  check(!/Generic features/.test(doc.body.textContent) && /Basis expansions/.test(doc.body.textContent), 'wing still called Generic features');
   check(app.live.every((p) => badge(p) === 'x' && /original/.test(p.badge.textContent)), 'tiles do not all say they show the original space');
   tiles[1].dispatchEvent(new w.PointerEvent('pointerenter'));
   await sleep(1100);
@@ -153,6 +159,12 @@ frame.addEventListener('load', async () => {
     check(/raw/.test(doc.querySelector('.acc-chip').textContent), 'no accuracy next to the plot');
     check(doc.querySelectorAll('.defs li').length >= 1 && doc.querySelector('.defs .katex'), 'no definitions');
     check(p.badge.dataset.space === 'x' && /Original space/.test(p.badge.textContent), `badge at t = 0: "${p.badge.textContent}"`);
+    // on arrival: the sliders, Φ and the model's equation are all on screen together
+    const onScreen = (el) => { const r = el.getBoundingClientRect(); return r.top >= -0.5 && r.bottom <= w.innerHeight + 0.5; };
+    const firstEq = doc.querySelector('.eqs .eq-row');
+    check([...doc.querySelectorAll('.knob input'), doc.querySelector('.phi-big'), firstEq].every(onScreen), 'sliders, Φ and the feature-space equation are not all on screen');
+    const order = [...doc.querySelectorAll('.ex-side > *')].map((el) => el.className);
+    check(order.indexOf('card about') > order.indexOf('card model') && !doc.querySelector('.card.rep .defs, .card.rep .chosen'), `definitions and the hand-chosen note should come after the model: ${order.join(' | ')}`);
     // Apply Φ, then back with Space
     btn(/Apply Φ/).click();
     await sleep(1900);
@@ -164,7 +176,10 @@ frame.addEventListener('load', async () => {
     check(p.t === 0 && /Apply Φ/.test(doc.querySelector('.play').textContent), `Space ended at t = ${p.t}`);
     // the slider, mid-morph
     await setT(0.5);
-    check(Math.abs(p.t - 0.5) < 1e-9 && p.badge.dataset.space === 'mid', `slider gave t = ${p.t}, badge ${p.badge.dataset.space}`);
+    check(Math.abs(p.t - 0.5) < 1e-9 && p.badge.dataset.space === 'mid' && p.badge.dataset.dir === 'forward' && /x → z/.test(p.badge.textContent), `slider gave t = ${p.t}, badge "${p.badge.textContent}"`);
+    await setT(0.3); // moving back toward x: the badge's arrow turns around
+    check(p.badge.dataset.dir === 'back' && /z = Φ\(x\) → x/.test(p.badge.textContent), `going back, badge "${p.badge.textContent}"`);
+    check(!/Where this shows up/.test(doc.querySelector('.ex-side').textContent), '"Where this shows up" is still there');
     // options: best straight line (checkbox, then R), grid lines (checkbox, then G)
     const [meshBox, rawBox] = [...doc.querySelectorAll('.stage-opts input')], stageEl = doc.querySelector('.stage');
     const size0 = stageEl.getBoundingClientRect();
@@ -213,10 +228,17 @@ frame.addEventListener('load', async () => {
   // ---- written-out equations: bumps, hinges and bins with their numbers ----
   current = 'equations';
   const eqText = () => doc.querySelector('.eqs').textContent;
-  await go('bumps');
+  await go('rbf');
   app.setKnob('m', 3); await sleep(150);
   check(app.plot.g.landmarks.length === 9 && !/too many/.test(eqText()) && doc.querySelectorAll('.eqs .katex').length >= 3, 'a 3 × 3 grid of bumps is not written out');
-  check(/9 bumps/.test(doc.querySelector('.ex-title .lead').textContent) && doc.querySelector('.phi-big').textContent.includes('1,…,9'), 'lead or Φ not updated for 9 bumps');
+  // the long equation scrolls under the sliders, which stay on screen
+  const rows = doc.querySelectorAll('.eqs .eq-row');
+  rows[rows.length - 1].scrollIntoView({ block: 'end' });
+  await sleep(40);
+  const kr = [...doc.querySelectorAll('.knob input')].map((el) => el.getBoundingClientRect()), lr = rows[rows.length - 1].getBoundingClientRect();
+  check(kr.every((r) => r.top >= 0 && r.bottom <= w.innerHeight) && lr.bottom <= w.innerHeight + 0.5 && lr.top >= kr[kr.length - 1].bottom, `scrolled to the end of the equation, the sliders are off screen or cover it (sliders end ${Math.round(kr[kr.length - 1].bottom)}, equation ${Math.round(lr.top)}–${Math.round(lr.bottom)})`);
+  w.scrollTo(0, 0);
+  check(/9 radial basis functions/.test(doc.querySelector('.ex-title .lead').textContent) && doc.querySelector('.phi-big').textContent.includes('1,…,9'), 'lead or Φ not updated for 9 bumps');
   app.setKnob('m', 7); await sleep(150);
   check(/too many/.test(eqText()), '49 bumps should not be written out in full');
   await go('relu');
@@ -255,7 +277,7 @@ frame.addEventListener('load', async () => {
   current = 'phone';
   frame.style.width = '390px'; frame.style.height = '844px';
   await sleep(150);
-  await go('bumps', 250);
+  await go('rbf', 250);
   const stageR = () => doc.querySelector('.stage').getBoundingClientRect();
   for (const input of [...doc.querySelectorAll('.knob input')]) {
     input.scrollIntoView({ block: 'end' });

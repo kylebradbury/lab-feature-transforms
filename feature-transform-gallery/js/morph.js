@@ -25,7 +25,7 @@ export class MorphPlot {
     this.tip = h('div', { class: 'tooltip', hidden: true });
     this.badge = h('div', { class: `space-badge${thumb ? ' thumb' : ''}`, hidden: true, 'aria-live': thumb ? null : 'polite' });
     box.append(this.canvas, this.badge, this.tip);
-    this.g = null; this.t = 0; this.hoverI = -1;
+    this.g = null; this.t = 0; this.dir = 1; this.hoverI = -1; // dir: +1 toward feature space, −1 back to x
     this.opts = { mesh: true, rawLine: false };
     this.images = null;
     this.ro = new ResizeObserver(() => this.resize());
@@ -37,7 +37,12 @@ export class MorphPlot {
   destroy() { this.ro.disconnect(); LIVE_PLOTS.delete(this); cancelAnimationFrame(this.anim); }
 
   set(g) { this.g = g; this.images = null; this.hoverI = -1; this.tip.hidden = true; this.draw(); }
-  setT(t) { this.t = Math.min(1, Math.max(0, t)); this.draw(); }
+  setT(t) {
+    t = Math.min(1, Math.max(0, t));
+    if (t !== this.t) this.dir = t > this.t ? 1 : -1;
+    this.t = t;
+    this.draw();
+  }
   setOpts(o) { Object.assign(this.opts, o); this.draw(); }
 
   // Animate t to `to` over `ms`; onStep(t) runs every frame.
@@ -135,16 +140,18 @@ export class MorphPlot {
     if (!this.thumb) this.drawAxes(c, e, T);
   }
 
-  // Which space is on screen: x at t = 0, z = Φ(x) at t = 1, and the morph in between.
+  // Which space is on screen: x at t = 0, z = Φ(x) at t = 1, and in between the
+  // morph, in the direction it is going (x → z, or back z → x).
   drawBadge() {
-    const t = this.t, s = t <= 1e-3 ? 'x' : t >= 1 - 1e-3 ? 'z' : 'mid', key = `${s}|${this.g.mode}`;
+    const t = this.t, s = t <= 1e-3 ? 'x' : t >= 1 - 1e-3 ? 'z' : this.dir > 0 ? 'mid' : 'back', key = `${s}|${this.g.mode}`;
     if (this.badgeKey !== key) {
       this.badgeKey = key;
       const edge = this.g.mode === 'edge';
       this.badge.textContent = this.thumb
-        ? { x: 'x · original space', z: `z = Φ(x) · ${edge ? 'edge-on' : 'feature space'}`, mid: 'x → z = Φ(x)' }[s]
-        : { x: 'Original space: x', z: `Feature space: z = Φ(x)${edge ? ', seen edge-on' : ''}`, mid: 'Applying Φ: x → z = Φ(x)' }[s];
-      this.badge.dataset.space = s;
+        ? { x: 'x · original space', z: `z = Φ(x) · ${edge ? 'edge-on' : 'feature space'}`, mid: 'x → z = Φ(x)', back: 'z = Φ(x) → x' }[s]
+        : { x: 'Original space: x', z: `Feature space: z = Φ(x)${edge ? ', seen edge-on' : ''}`, mid: 'Applying Φ: x → z = Φ(x)', back: 'Back to the original space: z = Φ(x) → x' }[s];
+      this.badge.dataset.space = s === 'back' ? 'mid' : s;
+      this.badge.dataset.dir = s === 'back' ? 'back' : 'forward';
       this.badge.hidden = false;
     }
     const { L, T } = this.rect;

@@ -26,7 +26,10 @@ root.append(
   h('header', { class: 'app-header' },
     h('a', { class: 'brand', href: '#' }, 'Feature Transform Gallery', h('small', {}, 'IDS 705 · one linear model, many boundaries')),
     h('div', { class: 'spacer' }), navHall, navMatch, themeBtn),
-  h('div', { id: 'view' }));
+  h('div', { id: 'view' }),
+  h('footer', { class: 'site-foot' },
+    '© 2026 ', h('a', { href: 'https://kylebradbury.com/', target: '_blank', rel: 'noopener' }, 'Kyle Bradbury'),
+    '. Designed by Kyle Bradbury, built with Claude.'));
 const viewEl = document.getElementById('view');
 
 // Plots and queued work belong to the page on screen; leaving it drops them.
@@ -97,7 +100,7 @@ function tile(ex) {
     h('div', { class: 'tile-plot' }, box),
     h('div', { class: 'tile-cap' },
       h('div', { class: 'tile-top' }, h('b', {}, ex.name), h('span', { class: 'fam' }, ex.family)),
-      h('div', { class: 'tile-phi', html: tex(val(ex.phi, ex.k0)) }),
+      h('div', { class: 'tile-phi', html: tex(val(ex.tilePhi || ex.phi, ex.k0)) }),
       acc));
   const plot = new MorphPlot(box, { thumb: true });
   live.push(plot);
@@ -174,7 +177,9 @@ function renderExhibit(target) {
       legend({ raw: true })),
     h('div', { class: 'stage-hint hint' }, 'Hover a point to see where Φ sends it. Keys: Space applies Φ, ← → change exhibit, Esc returns to the gallery.'));
 
-  // side: the settings first, then what Φ is, the model, accuracy, and where it is used
+  // side: the settings first, then Φ, the model and accuracy right below them, so
+  // every change shows up in the equations; the explanation, what was chosen by
+  // hand and the definitions come after.
   const leadEl = h('p', { class: 'lead' });
   const phiEl = h('div', { class: 'phi-big' });
   const howEl = h('p', { class: 'how' });
@@ -185,25 +190,26 @@ function renderExhibit(target) {
   const side = h('aside', { class: 'ex-side' }, h('header', { class: 'ex-title' }, h('span', { class: 'fam' }, ex.family), h('h1', {}, ex.name), leadEl));
   const sliders = {};
   if (ex.knobs) {
-    const k = knobsOf(ex), card = h('section', { class: 'card knob' }, h('h2', {}, ex.knobs.length > 1 ? 'Try other settings' : 'Try another setting'));
+    const k = knobsOf(ex), head = h('div', { class: 'knob-head' }, h('h2', {}, ex.knobs.length > 1 ? 'Try other settings' : 'Try another setting'));
+    const card = h('section', { class: 'card knob' }, head);
     for (const kn of ex.knobs) {
       sliders[kn.key] = slider({ label: kn.label, min: kn.min, max: kn.max, step: kn.step, log: kn.log, int: kn.int, value: k[kn.key], fmt: (v) => fmt(v, 2), onInput: (v) => setKnob(kn.key, v) });
       card.append(sliders[kn.key].el, kn.hint ? h('p', { class: 'hint knob-hint' }, kn.hint) : null);
     }
-    const reset = h('button', { class: 'btn', type: 'button' }, ex.knobs.length > 1 ? 'Reset all' : `Reset to ${ex.knobs[0].default}`);
+    const reset = h('button', { class: 'btn small', type: 'button' }, ex.knobs.length > 1 ? 'Reset all' : `Reset to ${ex.knobs[0].default}`);
     reset.addEventListener('click', () => {
       for (const kn of ex.knobs) sliders[kn.key].set(kn.default);
       knobs[ex.id] = {};
       scheduleRefresh();
     });
-    card.append(h('div', { class: 'knob-foot' }, reset));
+    head.append(reset);
     side.append(card);
   }
   side.append(
-    h('section', { class: 'card' }, h('h2', {}, 'The representation'), phiEl, howEl, chosenEl, defsEl),
-    h('section', { class: 'card' }, h('h2', {}, 'The same linear model'), eqEl),
+    h('section', { class: 'card rep' }, h('h2', {}, 'The representation'), phiEl),
+    h('section', { class: 'card model' }, h('h2', {}, 'The same linear model'), eqEl),
     h('section', { class: 'card' }, h('h2', {}, `Accuracy on ${SPLIT.nTest} new points`), accEl),
-    h('section', { class: 'card' }, h('h2', {}, 'Where this shows up'), h('p', {}, ex.practice)));
+    h('section', { class: 'card about' }, h('h2', {}, 'How this representation works'), howEl, chosenEl, defsEl));
 
   const page = h('main', { class: 'exhibit' }, nav, h('div', { class: 'ex-grid' }, stage, side));
   viewEl.append(page);
@@ -393,7 +399,7 @@ function renderMatch() {
       h('ol', { html: [
         '<b>The model never changed.</b> Every boundary in this gallery is \\(w_0 + w^\\top z = 0\\): a straight line, or a flat plane, in feature space.',
         '<b>The representation did the work.</b> The right \\(\\Phi\\) turns a hard problem into an easy one, often with one or two features. The wrong \\(\\Phi\\) does not help, however good the model.',
-        '<b>Good representations come from three places:</b> knowledge of the problem (distances, cycles, logs, interactions); generic families (polynomials, bumps, hinges), which need many features; or learning \\(\\Phi\\) from the data, which is what neural networks do.',
+        '<b>Good representations come from three places:</b> knowledge of the problem (distances, cycles, logs, interactions); basis expansions (polynomials, radial basis functions, ReLU units), which need many features; or learning \\(\\Phi\\) from the data, which is what neural networks do.',
       ].map((s) => `<li>${s}</li>`).join('') })));
   renderMath(page);
   viewEl.append(page);
