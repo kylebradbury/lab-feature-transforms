@@ -10,7 +10,7 @@
 //          vertical line u = −w₀/‖w‖ exactly.
 // geometry: everything the morph view draws, in [0, 1] plot coordinates for
 // both spaces: a mesh over the original box, the boundary contour, the
-// training points, landmarks, and axis ticks.
+// training points, landmarks, hinge fold lines, and axis ticks.
 
 import { makeSplit, DATASETS } from './datasets.js';
 import { prepare, makeTrainer, evaluate, viewFor } from './fit.js';
@@ -18,6 +18,10 @@ import { foldWeights } from './features.js';
 import { evalGrid, niceTicks, texLabel } from './plot2d.js';
 import { marchingSquares, chainSegments } from './geometry.js';
 import { RAW, val } from './exhibits.js';
+
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const sub = (n) => String(n).split('').map((c) => SUB[+c]).join('');
+const MAX_FOLDS = 12; // hinge fold lines are drawn up to this many hinges
 
 export const SPLIT = { nTrain: 200, nVal: 0, nTest: 400 };
 export const SEED = 705;
@@ -35,17 +39,17 @@ export function fitModel(split, features, view, lambda = LAMBDA) {
   return { prep, d: prep.d, wStd: Float64Array.from(tr.w), wRaw, ...evaluate(prep, wRaw) };
 }
 
-// One exhibit at knob value k, as a case for fitCase.
+// One exhibit at knob values k ({key: value}), as a case for fitCase.
 export function exhibitCase(ex, k = ex.k0) {
   return {
-    key: `${ex.id}|${k}`, ds: ex.ds, params: ex.params, view: ex.view, features: ex.features(k), lambda: ex.lambda,
-    zAxis: val(ex.zAxis, k), zTex: ex.zTex, collapse: !!ex.collapse, jumps: !!ex.jumps,
+    key: `${ex.id}|${Object.values(k).join(',')}`, ds: ex.ds, params: ex.params, view: ex.view, features: ex.features(k), lambda: ex.lambda,
+    zAxis: val(ex.zAxis, k), collapse: !!ex.collapse, jumps: !!ex.jumps,
   };
 }
 
 const fits = new Map(), geos = new Map();
 
-// c: {key, ds, params, features, view?, lambda?, zAxis?, zTex?, collapse?, jumps?}
+// c: {key, ds, params, features, view?, lambda?, zAxis?, collapse?, jumps?}
 export function fitCase(c) {
   if (fits.has(c.key)) return fits.get(c.key);
   const split = makeSplit(c.ds, c.params, { ...SPLIT, seed: SEED });
@@ -135,6 +139,16 @@ export function geometry(fc, res = 'full') {
   const LM = [];
   for (const part of fmap.parts) if (part.spec.id === 'rbf' && part.inst.centers) for (const [a, b] of part.inst.centers) { D(a, b, o); LM.push([nx(a), ny(b), o[0], o[1]]); }
 
+  // Hinges: the line u·(x − p) = 0 where each one folds, clipped to the box.
+  const folds = [];
+  for (const part of fmap.parts) if (part.spec.id === 'relu' && part.inst.units.U.length <= MAX_FOLDS) {
+    const { U, P } = part.inst.units;
+    U.forEach((u, j) => {
+      const seg = clipLine(P[j], [-u[1], u[0]], view);
+      if (seg) folds.push({ a: [nx(seg[0][0]), ny(seg[0][1])], b: [nx(seg[1][0]), ny(seg[1][1])], label: `h${sub(j + 1)}` });
+    });
+  }
+
   // display range: the image of the box plus the points, padded (none for Φ = identity)
   let range;
   if (isIdentity(fc)) range = { umin: view.xmin, umax: view.xmax, vmin: view.ymin, vmax: view.ymax };
@@ -177,13 +191,24 @@ export function geometry(fc, res = 'full') {
   const zAxis = display.mode === 'edge' ? ['w · z  (the direction the model uses)', 'another direction'] :
     fc.zAxis ? fc.zAxis : d === 1 ? [texLabel(fmap.columns[0].tex), 'x₂ (not used by the model)'] : fmap.columns.map((c) => texLabel(c.tex));
   const out = {
-    key, mode: display.mode, collapse: fc.collapse, jumps: fc.jumps, res, mesh, points, landmarks, heat, contour, rawLine, line, range, meshBox,
+    key, mode: display.mode, collapse: fc.collapse, jumps: fc.jumps, res, mesh, points, landmarks, folds, heat, contour, rawLine, line, range, meshBox,
     xTicks: [tick(view.xmin, view.xmax, 6, nx), tick(view.ymin, view.ymax, 6, ny)],
     zTicks: display.mode === 'edge' ? null : [tick(range.umin, range.umax, 5, nu), tick(range.vmin, range.vmax, 5, nv)],
     titles: { x: xAxis, z: zAxis },
   };
   geos.set(key, out);
   return out;
+}
+
+// The part of the line through p with direction v that lies inside the box, or null.
+function clipLine(p, v, box) {
+  let lo = -Infinity, hi = Infinity;
+  for (const [k, min, max] of [[0, box.xmin, box.xmax], [1, box.ymin, box.ymax]]) {
+    if (Math.abs(v[k]) < 1e-12) { if (p[k] < min || p[k] > max) return null; continue; }
+    const s1 = (min - p[k]) / v[k], s2 = (max - p[k]) / v[k];
+    lo = Math.max(lo, Math.min(s1, s2)); hi = Math.min(hi, Math.max(s1, s2));
+  }
+  return lo < hi ? [[p[0] + lo * v[0], p[1] + lo * v[1]], [p[0] + hi * v[0], p[1] + hi * v[1]]] : null;
 }
 
 // Weights for display: raw-space weights divided by the largest |wⱼ| (j ≥ 1).

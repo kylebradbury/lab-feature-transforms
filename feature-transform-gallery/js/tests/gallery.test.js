@@ -3,12 +3,12 @@
 // claim in the exhibit text and the finale holds on the real data and fits.
 
 import { suite, test, assert } from './harness.js';
-import { EXHIBITS, MATCH, byId } from '../exhibits.js';
+import { EXHIBITS, MATCH, byId, bumpParts, hingeParts, binParts } from '../exhibits.js';
 import { fitCase, exhibitCase, geometry, shownWeights } from '../build.js';
 
 suite('content');
 const pct = (v) => `${(100 * v).toFixed(1)}%`;
-const fitOf = (id, k) => fitCase(exhibitCase(byId(id), k));
+const fitOf = (id, k = {}) => fitCase(exhibitCase(byId(id), { ...byId(id).k0, ...k }));
 const w = (id) => shownWeights(fitOf(id).model.wRaw);
 
 for (const ex of EXHIBITS) {
@@ -61,17 +61,60 @@ test('feature counts named in the text: 9 (degree 3), 49 bumps, 60 hinges', () =
   assert(fitOf('poly3').model.d === 9 && fitOf('bumps').model.d === 49 && fitOf('relu').model.d === 60, 'feature count');
 });
 test('poly3: degree 1 is the raw features again', () => {
-  const fc = fitOf('poly3', 1);
+  const fc = fitOf('poly3', { deg: 1 });
   assert(Math.abs(fc.model.test.acc - fc.raw.test.acc) < 1e-9 && fc.model.d === 2, 'degree 1 differs from raw');
 });
 // Knob hints name the setting that matches the data: it must be the best one.
-for (const [id, ks] of [['flower', [2, 3, 4, 5, 6, 7, 8]], ['spiral', [0.5, 1, 1.5, 1.75, 2, 2.25, 2.5, 3]], ['wave', [0.5, 1, 1.5, 1.75, 2, 2.25, 2.5, 3, 4]]]) {
+for (const [id, key, ks] of [['flower', 'k', [2, 3, 4, 5, 6, 7, 8]], ['spiral', 'turns', [0.5, 1, 1.5, 1.75, 2, 2.25, 2.5, 3]], ['wave', 'w', [0.5, 1, 1.5, 1.75, 2, 2.25, 2.5, 3, 4]]]) {
   test(`${id}: the data's own setting is the best knob value`, () => {
-    const ex = byId(id), acc = ks.map((k) => fitOf(id, k).model.test.acc), best = Math.max(...acc);
-    assert(acc[ks.indexOf(ex.k0)] >= best - 1e-9, `k = ${ex.k0}: ${pct(acc[ks.indexOf(ex.k0)])}, best ${pct(best)}`);
+    const k0 = byId(id).k0[key], acc = ks.map((v) => fitOf(id, { [key]: v }).model.test.acc), best = Math.max(...acc);
+    assert(acc[ks.indexOf(k0)] >= best - 1e-9, `${key} = ${k0}: ${pct(acc[ks.indexOf(k0)])}, best ${pct(best)}`);
     return ks.map((k, j) => `${k}: ${pct(acc[j])}`).join(', ');
   });
 }
+
+// ---- definitions and written-out features ----
+test('every exhibit with a parameter inside Φ says it was chosen by hand', () => {
+  const want = ['circle', 'parabola', 'ring', 'flower', 'spiral', 'wedge', 'wave', 'checker', 'diamond', 'islands', 'bumps', 'relu', 'bins'];
+  for (const id of want) { const ex = byId(id); assert(ex.chosen && ex.chosen(ex.k0).length > 40, `${id}: no hand-chosen note`); }
+  for (const ex of EXHIBITS) if (ex.knobs) assert(ex.chosen, `${ex.id} has a knob but no hand-chosen note`);
+});
+test('every exhibit defines the functions in its Φ', () => {
+  for (const ex of EXHIBITS) {
+    const defs = typeof ex.defs === 'function' ? ex.defs(ex.k0) : null;
+    assert(Array.isArray(defs) && defs.length > 0 && defs.every((d) => typeof d === 'string' && d.length > 20), `${ex.id}: no definitions`);
+  }
+});
+// The equations write each feature out from these numbers; they must give the feature's value.
+const PTS = [[0.3, -1.7], [-2.2, 0.4], [1.9, 2.6], [-0.6, -2.9], [2.95, -0.05], [0, 0]];
+function sameAsFeatures(fc, f) {
+  const { fmap, d } = fc.model.prep, row = new Float64Array(d);
+  for (const [a, b] of PTS) {
+    fmap.evalRow(a, b, row);
+    for (let j = 0; j < d; j++) assert(Math.abs(f(j, a, b) - row[j]) < 1e-9, `feature ${j + 1} at (${a}, ${b}): ${f(j, a, b)} vs ${row[j]}`);
+  }
+}
+test('hinges written out as max(0, a·x₁ + b·x₂ + c) match the features', () => {
+  for (const m of [2, 6, 60]) {
+    const fc = fitOf('relu', { m }), H = hingeParts(fc);
+    assert(H.length === m, `${H.length} hinges for m = ${m}`);
+    sameAsFeatures(fc, (j, x1, x2) => Math.max(0, H[j].a * x1 + H[j].b * x2 + H[j].c));
+  }
+});
+test('bumps written out with their landmarks and γ match the features', () => {
+  for (const fc of [fitOf('bumps', { m: 3 }), fitOf('bumps'), fitOf('islands')]) {
+    const { gamma, centers } = bumpParts(fc);
+    sameAsFeatures(fc, (j, x1, x2) => Math.exp(-gamma * ((x1 - centers[j][0]) ** 2 + (x2 - centers[j][1]) ** 2)));
+  }
+  assert(fitOf('bumps', { m: 3 }).model.d === 9, 'a 3 × 3 grid has 9 bumps');
+});
+test('bins written out as 𝟙[lo ≤ xᵢ < hi] match the features', () => {
+  for (const B of [2, 6, 14]) {
+    const fc = fitOf('bins', { B }), P = binParts(fc);
+    assert(P.length === 2 * (B - 1), `${P.length} bins for B = ${B}`);
+    sameAsFeatures(fc, (j, x1, x2) => { const v = P[j].axis === 1 ? x1 : x2; return v >= P[j].lo && (P[j].hi === null || v < P[j].hi) ? 1 : 0; });
+  }
+});
 
 // ---- finale ----
 const MATCHING = { blobs: 'line', circles: 'circle', xor: 'hyperbola', ring: 'ring', sine: 'wave', spirals: 'spiral' };

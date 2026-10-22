@@ -6,6 +6,7 @@
 // training points, a coarse mesh of grid lines (the "rubber sheet"), small
 // cells shaded by the model's prediction, and the boundary curve, which lands
 // on a straight line. At t = 1 the shading becomes the model's two half-planes.
+// A badge in the corner always says which space is on screen.
 
 import { theme, lut, LIVE_PLOTS } from './plot2d.js';
 import { h, isPresent } from './ui.js';
@@ -22,7 +23,8 @@ export class MorphPlot {
     this.canvas = h('canvas', { role: 'img', 'aria-label': 'Decision boundary in the original space and in feature space' });
     this.ctx = this.canvas.getContext('2d');
     this.tip = h('div', { class: 'tooltip', hidden: true });
-    box.append(this.canvas, this.tip);
+    this.badge = h('div', { class: `space-badge${thumb ? ' thumb' : ''}`, hidden: true, 'aria-live': thumb ? null : 'polite' });
+    box.append(this.canvas, this.badge, this.tip);
     this.g = null; this.t = 0; this.hoverI = -1;
     this.opts = { mesh: true, rawLine: false };
     this.images = null;
@@ -100,6 +102,7 @@ export class MorphPlot {
     c.fillStyle = T.mid; c.fillRect(L, top, W, H);
     if (!g) return;
     this.ensureImages();
+    this.drawBadge();
     const e = ease(this.t), f = 1 - e;
     const X = (a, b) => L + W * (f * a + e * b), Y = (a, b) => top + H * (1 - (f * a + e * b));
     // Pieces stretched further than this are torn apart, not drawn. Features that
@@ -117,6 +120,8 @@ export class MorphPlot {
       if (qA > 0) this.drawCells(c, X, Y, tear * Math.min(W, H), qA);
     }
     if (this.opts.mesh) this.drawMesh(c, X, Y, tear * Math.min(W, H), T);
+    const foldA = 1 - smooth(0, 0.3, e);
+    if (g.folds.length && foldA > 0) this.drawFolds(c, L, top, W, H, foldA, T);
 
     // the boundary: the curve carried along, and in feature space the full straight line
     const lineA = smooth(0.55, 1, e);
@@ -128,6 +133,41 @@ export class MorphPlot {
     this.drawPoints(c, X, Y, T);
     c.restore();
     if (!this.thumb) this.drawAxes(c, e, T);
+  }
+
+  // Which space is on screen: x at t = 0, z = Φ(x) at t = 1, and the morph in between.
+  drawBadge() {
+    const t = this.t, s = t <= 1e-3 ? 'x' : t >= 1 - 1e-3 ? 'z' : 'mid', key = `${s}|${this.g.mode}`;
+    if (this.badgeKey !== key) {
+      this.badgeKey = key;
+      const edge = this.g.mode === 'edge';
+      this.badge.textContent = this.thumb
+        ? { x: 'x · original space', z: `z = Φ(x) · ${edge ? 'edge-on' : 'feature space'}`, mid: 'x → z = Φ(x)' }[s]
+        : { x: 'Original space: x', z: `Feature space: z = Φ(x)${edge ? ', seen edge-on' : ''}`, mid: 'Applying Φ: x → z = Φ(x)' }[s];
+      this.badge.dataset.space = s;
+      this.badge.hidden = false;
+    }
+    const { L, T } = this.rect;
+    this.badge.style.left = `${L + 6}px`;
+    this.badge.style.top = `${T + 6}px`;
+  }
+
+  // Hinges: the line where each one folds (0 on one side, rising on the other), labeled hⱼ.
+  drawFolds(c, L, top, W, H, alpha, T) {
+    c.save();
+    c.globalAlpha = alpha; c.setLineDash([5, 4]); c.lineWidth = this.thumb ? 1 : 1.4; c.strokeStyle = T.ink2;
+    for (const { a, b } of this.g.folds) {
+      c.beginPath(); c.moveTo(L + W * a[0], top + H * (1 - a[1])); c.lineTo(L + W * b[0], top + H * (1 - b[1])); c.stroke();
+    }
+    c.setLineDash([]);
+    if (!this.thumb) {
+      c.font = '600 12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3;
+      for (const { a, b, label: lab } of this.g.folds) {
+        const x = L + W * (a[0] + 0.12 * (b[0] - a[0])), y = top + H * (1 - (a[1] + 0.12 * (b[1] - a[1])));
+        c.strokeStyle = T.surface; c.strokeText(lab, x, y); c.fillStyle = T.ink; c.fillText(lab, x, y);
+      }
+    }
+    c.restore();
   }
 
   drawCells(c, X, Y, tearPx, alpha) {

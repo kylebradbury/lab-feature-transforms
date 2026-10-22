@@ -16,6 +16,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .legend .sw.square { border-radius: 1px; }
 .legend .sw.c1 { box-shadow: 0 0 0 1px var(--class1-edge); }
 .legend .sw.dash { height: 0; width: 18px; border-top: 3px dashed var(--fit); vertical-align: 3px; background: none; }
+.legend .raw-key.off { visibility: hidden; } /* keeps its space: toggling it must not resize the card */
+
+/* which space a plot shows: x (original), z = Φ(x) (feature space), or the morph between */
+.space-badge {
+  position: absolute; z-index: 3; pointer-events: none; max-width: calc(100% - 12px);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 12px; font-weight: 650; line-height: 1.2; padding: 3px 8px; border-radius: 999px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.space-badge[data-space="z"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.space-badge[data-space="mid"] { font-style: italic; }
+.space-badge.thumb { font-size: 10.5px; font-weight: 600; padding: 2px 6px; }
 
 /* ---------- hall ---------- */
 .hall, .match { max-width: 1360px; margin: 0 auto; padding: 22px 24px 56px; }
@@ -61,11 +73,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .ex-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 10px; }
 .ex-nav .where { font-size: 0.85em; color: var(--ink-2); }
 .ex-nav .spacer { flex: 1; }
-/* The plot is a square as large as the screen height allows; the text column takes the rest. */
-.exhibit { --stage: max(340px, min(calc(100vh - 52px - 262px), calc(100vw - 36px - 16px - 26px - 400px))); }
+/* The plot is a square as large as the screen height allows; the text column takes the rest.
+   The stage stays in view (sticky) while the text column scrolls, so every control can be
+   used while watching the plot. */
+.exhibit { --stage: max(320px, min(calc(100vh - 52px - 280px), calc(100vw - 36px - 16px - 26px - 400px))); }
 .ex-grid { display: grid; grid-template-columns: auto minmax(360px, 640px); justify-content: center; gap: 16px; align-items: start; }
-.stage { display: flex; flex-direction: column; gap: 8px; }
-.stage .plot-title { margin: 0; flex-wrap: wrap; }
+.stage { display: flex; flex-direction: column; gap: 8px; z-index: 4; }
+@media (min-width: 861px) and (min-height: 600px) { .stage { position: sticky; top: 64px; } }
+.stage .plot-title { margin: 0; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.acc-chip { font-size: 0.85em; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.acc-chip .raw { color: var(--muted); }
+.acc-chip b { color: var(--ink); font-size: 1.1em; }
+.stage-hint { font-size: 0.8em; margin: -2px 0 0; color: var(--muted); }
 .stage .plot-title b { font-size: 1.05em; }
 .stage .plot-title .sub { color: var(--ink-2); }
 .stage-wrap { width: var(--stage); height: var(--stage); }
@@ -86,10 +105,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .phi-big { font-size: 1.12em; overflow-x: auto; overflow-y: hidden; }
 .phi-big .katex-display { margin: 4px 0 8px; }
 .how { font-size: 0.92em; margin: 0; }
+.chosen { margin-top: 10px; padding: 8px 10px; border-left: 3px solid var(--ink-2); background: var(--wash); border-radius: 0 6px 6px 0; font-size: 0.86em; }
+.chosen .katex { font-size: 1em; }
+.defs { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.84em; color: var(--ink-2); }
+.defs-title { font-size: 0.86em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.defs ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 3px; }
+.defs .katex { font-size: 1em; }
 .eq-row { margin-bottom: 8px; }
 .eq-row .lab { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
 .eq-row .math { overflow-x: auto; overflow-y: hidden; padding: 2px 0; font-size: 1.05em; }
 .eq-row .note { font-size: 0.86em; color: var(--ink-2); }
+.eq-row .katex-display { margin: 2px 0; text-align: left; }
+.eq-row .katex-display > .katex { text-align: left; }
 .eqs > .hint { margin: 0; }
 .accrow { display: grid; grid-template-columns: minmax(0, 1fr) 62px; grid-template-areas: "lab lab" "track val"; gap: 2px 10px; align-items: center; margin-bottom: 8px; }
 .accrow .lab { grid-area: lab; font-size: 0.88em; }
@@ -101,7 +128,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .accrow.raw .val { color: var(--ink-2); font-weight: 500; }
 .accbars .hint { margin: 2px 0 0; }
 .knob .ctl { margin-top: 0; }
-.knob-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.knob .knob-hint { margin: 0 0 8px; }
+.knob-foot { display: flex; justify-content: flex-end; }
 
 /* ---------- finale ---------- */
 .mscroll { overflow-x: auto; padding-bottom: 6px; }
@@ -130,12 +158,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 @media (max-width: 860px) {
   .ex-grid { grid-template-columns: minmax(0, 1fr); }
-  .stage-wrap { width: auto; height: auto; }
-  .stage-wrap .plot-box { width: 100%; height: auto; aspect-ratio: 1 / 1; }
+  .exhibit { --stage: calc(100vw - 52px); }
+  .stage-wrap { margin: 0 auto; }
+  .stage-hint { display: none; }
   .hall, .match { padding: 16px 16px 40px; }
   .exhibit { padding: 10px 12px 24px; }
   .morph-ctl { grid-template-columns: auto minmax(0, 1fr); }
   .morph-ctl .end { display: none; }
+}
+/* Tall narrow screens: a smaller plot that stays on top while the text scrolls under it. */
+@media (max-width: 860px) and (min-height: 700px) {
+  .exhibit { --stage: min(calc(100vw - 52px), 40vh); }
+  .stage { position: sticky; top: 56px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12); }
 }
 @media (max-width: 560px) {
   .app-header .nav-hall, .stage .plot-title .hint { display: none; }

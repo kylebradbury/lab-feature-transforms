@@ -13,7 +13,7 @@ const T0 = refreshTheme();
 const NAME = T0.names; // class names used in text, from the theme (e.g. ['blue', 'orange'])
 const pct0 = (v) => `${Math.round(100 * v)}%`;
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const knobs = {}; // exhibit id → knob value (this visit only)
+const knobs = {}; // exhibit id → {knob key: value} changed on this visit
 const view = { mesh: true, rawLine: false, ...(store('gallery:view') || {}) };
 
 // ---------- shell ----------
@@ -53,7 +53,7 @@ function legend({ raw = false } = {}) {
     h('span', {}, h('span', { class: `sw c0 ${T0.shape0}` }), `class 0 (${NAME[0]})`),
     h('span', {}, h('span', { class: `sw c1 ${T0.shape1}` }), `class 1 (${NAME[1]})`),
     h('span', {}, h('span', { class: 'sw line' }), 'boundary'),
-    raw ? h('span', { class: 'raw-key', hidden: !view.rawLine }, h('span', { class: 'sw dash' }), 'best straight line (raw features)') : null);
+    raw ? h('span', { class: `raw-key${view.rawLine ? '' : ' off'}` }, h('span', { class: 'sw dash' }), 'best straight line (raw features)') : null);
 }
 
 function accLine(fc) {
@@ -134,6 +134,7 @@ function hoverMorph(el, plot) {
 // ---------- one exhibit ----------
 
 let ex = null, fc = null, plot = null, ui = null;
+const knobsOf = (e) => ({ ...e.k0, ...(knobs[e.id] || {}) });
 
 function renderExhibit(target) {
   ex = target;
@@ -146,9 +147,11 @@ function renderExhibit(target) {
     h('a', { class: 'btn', href: `#${prev.id}`, title: `Previous: ${prev.name} (←)` }, `‹ ${prev.name}`),
     h('a', { class: 'btn', href: `#${next.id}`, title: `Next: ${next.name} (→)` }, `${next.name} ›`));
 
-  // stage: the morph plot and its controls
+  // stage: the morph plot and its controls. It stays in view (sticky) while
+  // the text column scrolls, so every control can be used while watching it.
   const spaceName = h('b', {}, 'Original space');
   const spaceSub = h('span', { class: 'sub' });
+  const accChip = h('span', { class: 'acc-chip', title: `Accuracy on ${SPLIT.nTest} new points` });
   const box = h('div', { class: 'plot-box' });
   const play = h('button', { class: 'btn primary play', type: 'button', title: 'Space' });
   const range = h('input', { type: 'range', class: 'morph', min: 0, max: 1000, step: 1, value: 0, 'aria-label': 'From the original space (0) to feature space (1000)' });
@@ -157,38 +160,50 @@ function renderExhibit(target) {
   meshBox.checked = view.mesh;
   rawBox.checked = view.rawLine;
   const stage = h('section', { class: 'card stage' },
-    h('div', { class: 'plot-title' }, h('span', {}, spaceName, ' ', spaceSub), h('span', { class: 'hint' }, 'Hover a point to see where Φ sends it')),
+    h('div', { class: 'plot-title' }, h('span', {}, spaceName, ' ', spaceSub), accChip),
     h('div', { class: 'stage-wrap' }, box),
     h('div', { class: 'morph-ctl' },
       play,
-      h('span', { class: 'end' }, 'original space'),
+      h('span', { class: 'end' }, 'original space x'),
       range,
-      h('span', { class: 'end' }, 'feature space')),
+      h('span', { class: 'end' }, 'feature space z')),
     h('div', { class: 'stage-opts' },
       h('span', { class: 'opts' },
         h('label', { title: 'Grid lines of the original space, carried along by Φ (G)' }, meshBox, 'grid lines'),
         h('label', { title: 'Logistic regression on the raw x₁, x₂, for comparison (R)' }, rawBox, 'best straight line')),
-      legend({ raw: true })));
+      legend({ raw: true })),
+    h('div', { class: 'stage-hint hint' }, 'Hover a point to see where Φ sends it. Keys: Space applies Φ, ← → change exhibit, Esc returns to the gallery.'));
 
-  // side: what Φ is, what the model is, how well it does, where it is used
+  // side: the settings first, then what Φ is, the model, accuracy, and where it is used
+  const leadEl = h('p', { class: 'lead' });
   const phiEl = h('div', { class: 'phi-big' });
   const howEl = h('p', { class: 'how' });
+  const chosenEl = h('div', { class: 'chosen' });
+  const defsEl = h('div', { class: 'defs' });
   const eqEl = h('div', { class: 'eqs' });
   const accEl = h('div', { class: 'accbars' });
-  const side = h('aside', { class: 'ex-side' },
-    h('header', { class: 'ex-title' }, h('span', { class: 'fam' }, ex.family), h('h1', {}, ex.name), h('p', { class: 'lead' }, ex.lead)),
-    h('section', { class: 'card' }, h('h2', {}, 'The representation'), phiEl, howEl),
-    h('section', { class: 'card' }, h('h2', {}, 'The same linear model'), eqEl),
-    h('section', { class: 'card' }, h('h2', {}, `Accuracy on ${SPLIT.nTest} new points`), accEl));
-  let knob = null;
-  if (ex.knob) {
-    const kn = ex.knob, k = knobs[ex.id] ?? ex.k0;
-    const reset = h('button', { class: 'btn', type: 'button' }, `Reset to ${kn.default}`);
-    knob = slider({ label: kn.label, min: kn.min, max: kn.max, step: kn.step, log: kn.log, int: kn.int, value: k, fmt: (v) => fmt(v, 2), onInput: (v) => setKnob(v) });
-    reset.addEventListener('click', () => { knob.set(kn.default); setKnob(kn.default); });
-    side.append(h('section', { class: 'card knob' }, h('h2', {}, 'Try another setting'), knob.el, h('div', { class: 'knob-foot' }, kn.hint ? h('span', { class: 'hint' }, kn.hint) : h('span'), reset)));
+  const side = h('aside', { class: 'ex-side' }, h('header', { class: 'ex-title' }, h('span', { class: 'fam' }, ex.family), h('h1', {}, ex.name), leadEl));
+  const sliders = {};
+  if (ex.knobs) {
+    const k = knobsOf(ex), card = h('section', { class: 'card knob' }, h('h2', {}, ex.knobs.length > 1 ? 'Try other settings' : 'Try another setting'));
+    for (const kn of ex.knobs) {
+      sliders[kn.key] = slider({ label: kn.label, min: kn.min, max: kn.max, step: kn.step, log: kn.log, int: kn.int, value: k[kn.key], fmt: (v) => fmt(v, 2), onInput: (v) => setKnob(kn.key, v) });
+      card.append(sliders[kn.key].el, kn.hint ? h('p', { class: 'hint knob-hint' }, kn.hint) : null);
+    }
+    const reset = h('button', { class: 'btn', type: 'button' }, ex.knobs.length > 1 ? 'Reset all' : `Reset to ${ex.knobs[0].default}`);
+    reset.addEventListener('click', () => {
+      for (const kn of ex.knobs) sliders[kn.key].set(kn.default);
+      knobs[ex.id] = {};
+      scheduleRefresh();
+    });
+    card.append(h('div', { class: 'knob-foot' }, reset));
+    side.append(card);
   }
-  side.append(h('section', { class: 'card' }, h('h2', {}, 'Where this shows up'), h('p', {}, ex.practice)));
+  side.append(
+    h('section', { class: 'card' }, h('h2', {}, 'The representation'), phiEl, howEl, chosenEl, defsEl),
+    h('section', { class: 'card' }, h('h2', {}, 'The same linear model'), eqEl),
+    h('section', { class: 'card' }, h('h2', {}, `Accuracy on ${SPLIT.nTest} new points`), accEl),
+    h('section', { class: 'card' }, h('h2', {}, 'Where this shows up'), h('p', {}, ex.practice)));
 
   const page = h('main', { class: 'exhibit' }, nav, h('div', { class: 'ex-grid' }, stage, side));
   viewEl.append(page);
@@ -196,7 +211,7 @@ function renderExhibit(target) {
   plot = new MorphPlot(box, { onHover: pointTip });
   plot.setOpts({ mesh: view.mesh, rawLine: view.rawLine });
   live.push(plot);
-  ui = { spaceName, spaceSub, play, range, phiEl, howEl, eqEl, accEl, rawKey: stage.querySelector('.raw-key'), meshBox, rawBox, knob };
+  ui = { spaceName, spaceSub, accChip, play, range, leadEl, phiEl, howEl, chosenEl, defsEl, eqEl, accEl, rawKey: stage.querySelector('.raw-key'), meshBox, rawBox, sliders };
 
   const onT = (t) => {
     ui.range.value = String(Math.round(1000 * t));
@@ -224,50 +239,85 @@ function setView(o) {
   if (!plot) return;
   ui.meshBox.checked = view.mesh;
   ui.rawBox.checked = view.rawLine;
-  ui.rawKey.hidden = !view.rawLine;
+  ui.rawKey.classList.toggle('off', !view.rawLine); // keeps its space, so the card does not change size
   plot.setOpts({ mesh: view.mesh, rawLine: view.rawLine });
 }
 
 let knobFrame = 0;
-function setKnob(v) {
-  knobs[ex.id] = v;
+function setKnob(key, v) {
+  knobs[ex.id] = { ...(knobs[ex.id] || {}), [key]: v };
+  scheduleRefresh();
+}
+function scheduleRefresh() {
   cancelAnimationFrame(knobFrame);
   knobFrame = requestAnimationFrame(refresh);
 }
 
-// Fit (cached) for the current knob value and update every panel.
+// Fit (cached) for the current knob values and update every panel.
 function refresh() {
-  const k = knobs[ex.id] ?? ex.k0;
+  const k = knobsOf(ex);
   fc = fitCase(exhibitCase(ex, k));
-  const g = geometry(fc, 'full');
-  plot.set(g);
+  plot.set(geometry(fc, 'full'));
+  ui.leadEl.textContent = val(ex.lead, k);
   ui.phiEl.innerHTML = tex(val(ex.phi, k), true);
   ui.howEl.innerHTML = val(ex.how, k);
-  ui.eqEl.innerHTML = equations(fc, val(ex.shape, k));
+  ui.defsEl.innerHTML = definitions(val(ex.defs, k));
+  ui.chosenEl.hidden = !ex.chosen;
+  if (ex.chosen) {
+    ui.chosenEl.innerHTML = `<b>Chosen by hand, not fit:</b> ${ex.chosen(k)}`;
+    renderMath(ui.chosenEl);
+  }
+  ui.eqEl.innerHTML = equations(fc, k);
   ui.accEl.innerHTML = accBars(fc);
+  ui.accChip.innerHTML = `new data: <span class="raw">${pct(fc.raw.test.acc)}</span> raw → <b>${pct(fc.model.test.acc)}</b> with ${tex('\\Phi')}`;
 }
 
-const zTex = (fc, j) => (fc.zTex && fc.model.d === fc.zTex.length ? fc.zTex[j] : fc.model.prep.fmap.columns[j].tex);
-const num = (v) => (Math.abs(v) < 0.005 ? '0.00' : Math.abs(v).toFixed(2));
-function eqTex(w, terms) {
-  let s = `${w[0] <= -0.005 ? '-' : ''}${num(w[0])}`;
-  terms.forEach((t, j) => { s += ` ${w[j + 1] <= -0.005 ? '-' : '+'} ${num(w[j + 1])}\\,${t}`; });
-  return `${s} = 0`;
+function definitions(items) {
+  const el = h('div', {}, h('div', { class: 'defs-title' }, 'Definitions'), h('ul', { html: items.map((d) => `<li>${d}</li>`).join('') }));
+  renderMath(el);
+  return el.innerHTML;
 }
-function equations(fc, shape) {
-  const { model, display } = fc, d = model.d, cols = model.prep.fmap.columns, w = shownWeights(model.wRaw);
-  const row = (lab, math, note) => `<div class="eq-row"><div class="lab">${lab}</div><div class="math">${math}</div><div class="note">${note}</div></div>`;
-  let out;
-  if (display.mode === 'edge') {
-    out = row('In feature space', tex(`w_0 + w_1 z_1 + w_2 z_2 + \\dots + w_{${d}} z_{${d}} = 0`), `A flat hyperplane in ${d} dimensions, seen edge-on as the vertical line above.`);
-  } else {
-    const zs = d === 1 ? ['z_1'] : ['z_1', 'z_2'];
-    const where = cols.map((c, j) => `${zs[j]} = ${zTex(fc, j)}`).join(',\\quad ');
-    out = row('In feature space', tex(eqTex(w, zs)), d === 1 ? `A single cut point on the \\(z_1\\) axis, where ${tex(where)}.` : `A straight line, where ${tex(where)}.`);
-  }
-  const xs = d <= 10 ? tex(eqTex(w, cols.map((c, j) => zTex(fc, j)))) : `<span class="hint">${d} terms: too many to write out.</span>`;
-  out += row('In the original space', xs, `The same equation in \\(x\\): ${shape}.`);
-  out += `<p class="hint">Weights divided by the largest one: only their ratios place the boundary.</p>`;
+
+// ---- the boundary equation, written out ----
+
+const WRITE_OUT = 10; // up to this many features, every one is written out with its number
+const num = (v) => (Math.abs(v) < 0.005 ? '0.00' : Math.abs(v).toFixed(2));
+// w₀ + w₁·t₁ + … = 0, on one line when short, else as aligned lines of a few terms.
+function eqTex(w, terms) {
+  // braces keep a leading minus unary (no gap) at the start of an aligned line
+  const parts = [`{${w[0] <= -0.005 ? '-' : ''}${num(w[0])}}`, ...terms.map((t, j) => `${w[j + 1] <= -0.005 ? '-' : '+'} ${num(w[j + 1])}\\,${t}`)];
+  const len = Math.max(0, ...terms.map((t) => t.length));
+  const per = len > 28 ? 1 : len > 16 ? 2 : len > 8 ? 3 : 4;
+  if (parts.length <= per + 1) return tex(`${parts.join(' ')} = 0`);
+  const lines = [parts.slice(0, per + 1).join(' ')];
+  for (let j = per + 1; j < parts.length; j += per) lines.push(`\\quad ${parts.slice(j, j + per).join(' ')}`);
+  return tex(`\\begin{aligned} &${lines.join(' \\\\ &')} = 0 \\end{aligned}`, true);
+}
+// Each feature z_j in x: written out by the exhibit (with fitted numbers), else its own TeX.
+function featureTerms(fc, k) {
+  return ex.terms ? ex.terms(fc, k) : fc.model.prep.fmap.columns.map((c) => c.tex);
+}
+function equations(fc, k) {
+  const { model, display } = fc, d = model.d, w = shownWeights(model.wRaw), T = featureTerms(fc, k);
+  const z = (j) => `z_{${j + 1}}`, name = (j) => (ex.featureName ? `${ex.featureName(j + 1)} = ` : '');
+  const row = (lab, math, note = '') => `<div class="eq-row"><div class="lab">${lab}</div><div class="math">${math}</div>${note ? `<div class="note">${note}</div>` : ''}</div>`;
+  const small = d <= WRITE_OUT;
+  // in feature space: a line (d ≤ 2) or a flat hyperplane
+  const zEq = small ? eqTex(w, T.map((_, j) => z(j))) : tex(`w_0 + w_1 z_1 + w_2 z_2 + \\dots + w_{${d}} z_{${d}} = 0`);
+  const zNote = display.mode === 'line' ? 'A single cut point on the \\(z_1\\) axis.' : display.mode === 'plane' ? 'A straight line.'
+    : `A flat hyperplane in ${d} dimensions, seen edge-on as the vertical line in the plot.`;
+  let out = row('In feature space', zEq, zNote);
+  // what each z_j is
+  const show = small ? T.map((_, j) => j) : [0, 1, 2, -1, d - 1];
+  const defLine = (j) => (j < 0 ? '&\\ \\ \\vdots' : `${z(j)} &= ${name(j)}${T[j]}`);
+  const short = d <= 2 && T.every((t) => t.length <= 22) && !ex.featureName;
+  const where = short ? tex(T.map((t, j) => `${z(j)} = ${t}`).join(',\\quad ')) : tex(`\\begin{aligned} ${show.map(defLine).join(' \\\\ ')} \\end{aligned}`, true);
+  out += row(small ? 'where the features are' : `where the features are (${d} in all)`, where, ex.whereNote ? val(ex.whereNote, k) : '');
+  // in the original space: every z_j replaced by its formula
+  out += row('In the original space', small ? eqTex(w, T)
+    : `<span class="hint">Put each feature’s formula in place of its \\(z_j\\): ${d} terms, too many to write out here.</span>`,
+  `The same equation, written in \\(x\\): ${val(ex.shape, k)}.`);
+  out += '<p class="hint">\\(w_0\\) is the bias and \\(w_1, w_2, \\dots\\) are the weights, all divided by the largest \\(\\lvert w_j\\rvert\\): only their ratios place the boundary.</p>';
   const el = h('div', { html: out });
   renderMath(el);
   return el.innerHTML;
@@ -289,7 +339,7 @@ function pointTip(i) {
   const z = mode === 'edge' ? `<span class="k">score w₀ + wᵀz</span> = ${fmt(s)}` :
     mode === 'line' ? `<span class="k">z₁ = ${za}</span> = ${fmt(u)}` :
       `<span class="k">z₁ = ${za}</span> = ${fmt(u)}<br><span class="k">z₂ = ${zb}</span> = ${fmt(v)}`;
-  return `<span class="k">${xa}</span> = ${fmt(tr.X[2 * i])}, <span class="k">${xb}</span> = ${fmt(tr.X[2 * i + 1])}<div class="sep"></div>${z}<div class="sep"></div>` +
+  return `<span class="k">original x:</span> ${xa} = ${fmt(tr.X[2 * i])}, ${xb} = ${fmt(tr.X[2 * i + 1])}<div class="sep"></div><span class="k">features z = Φ(x):</span><br>${z}<div class="sep"></div>` +
     `class <b>${NAME[y]}</b>, predicted <b>${NAME[pred]}</b> ${pred === y ? '✓' : '✗'}`;
 }
 
@@ -404,5 +454,5 @@ route();
 // for the console and tests
 window.gallery = {
   exhibits: EXHIBITS, get plot() { return plot; }, get fit() { return fc; }, get live() { return live; },
-  togglePlay, setView, setKnob: (v) => { if (ui && ui.knob) ui.knob.set(v); setKnob(v); }, theme,
+  togglePlay, setView, setKnob: (key, v) => { if (ui && ui.sliders[key]) ui.sliders[key].set(v); setKnob(key, v); }, theme,
 };
