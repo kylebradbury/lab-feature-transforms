@@ -4,15 +4,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Polynomial Features Lab</title>
-  <meta name="description" content="Interactive lab: set logistic regression weights by hand on raw features x₁, x₂, then add degree-2 polynomial features and compare with the best fit.">
+  <meta name="description" content="Interactive lab: set logistic regression weights by hand on raw features x₁, x₂, then add polynomial features and compare with the best fit.">
   <script>
-    // Apply the saved theme before first paint (shared with the main lab).
-    try { var t = JSON.parse(localStorage.getItem('ftlab:theme')); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    // Light or dark before first paint: the saved choice (Theme button), else the system setting.
+    (function () {
+      var mode = null;
+      try { mode = JSON.parse(localStorage.getItem('ftlab:theme')); } catch (e) {}
+      if (mode !== 'light' && mode !== 'dark') mode = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = mode;
+    })();
   </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
         integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
   <link rel="stylesheet" href="css/lab.css">
   <link rel="stylesheet" href="css/poly.css">
+  <!-- COLOR THEME. Every color (and the class names and point shapes) is set in
+       this one file. "brand" = green and dark gray; "classic" = the original
+       orange and blue. Change the file name to switch themes, or preview another
+       without editing: index.html?theme=classic -->
+  <link rel="stylesheet" href="css/themes/classic.css">
+  <script>
+    // ?theme=<name> loads css/themes/<name>.css on top of the theme above.
+    (function () {
+      var t = new URLSearchParams(location.search).get('theme');
+      if (t && /^[a-z0-9-]+$/.test(t)) document.write('<link rel="stylesheet" href="css/themes/' + t + '.css">');
+    })();
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
           integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"

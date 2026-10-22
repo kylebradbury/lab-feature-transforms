@@ -1,0 +1,147 @@
+/* Feature Transform Gallery: hall of tiles, exhibit rooms, finale matrix.
+   Builds on lab.css (cards, buttons, header); colors come from css/themes/. */
+
+body.ftg { min-height: 100vh; }
+body.ftg [hidden] { display: none !important; }
+body.ftg .app-header { box-shadow: inset 0 4px 0 var(--header-stripe); }
+.app-header a.brand { text-decoration: none; }
+.app-header a.icon-btn { text-decoration: none; }
+.app-header a.icon-btn[aria-current="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+a.btn { text-decoration: none; color: inherit; display: inline-block; }
+.kicker { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 650; }
+.fam { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); white-space: nowrap; font-weight: 600; }
+
+/* legend swatches (point shapes and line styles follow the theme) */
+.legend .sw.circle { border-radius: 50%; }
+.legend .sw.square { border-radius: 1px; }
+.legend .sw.c1 { box-shadow: 0 0 0 1px var(--class1-edge); }
+.legend .sw.dash { height: 0; width: 18px; border-top: 3px dashed var(--fit); vertical-align: 3px; background: none; }
+
+/* ---------- hall ---------- */
+.hall, .match { max-width: 1360px; margin: 0 auto; padding: 22px 24px 56px; }
+.hero { margin-bottom: 18px; }
+.hero h1 { font-size: clamp(1.9em, 3.2vw, 2.7em); line-height: 1.12; margin: 4px 0 10px; font-weight: 700; letter-spacing: -0.01em; }
+.hero .lead { font-size: 1.12em; line-height: 1.55; max-width: 76ch; margin: 0 0 8px; color: var(--ink-2); }
+.hero .lead b { color: var(--ink); }
+.hero .howto { margin: 0 0 10px; color: var(--muted); font-size: 0.92em; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.hero-actions .play { padding: 7px 14px; font-weight: 650; min-width: 160px; }
+.hero-actions .legend { margin-top: 0; }
+.wing { margin-top: 26px; }
+.wing h2 { font-size: 1.25em; margin: 0 0 2px; font-weight: 650; }
+.wing .blurb { margin: 0 0 12px; color: var(--ink-2); max-width: 80ch; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 14px; }
+.tile {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  text-decoration: none; color: inherit; overflow: hidden; transition: border-color 0.15s, transform 0.15s;
+}
+.tile:hover, .tile:focus-visible { border-color: var(--ink-2); transform: translateY(-2px); outline: none; }
+.tile:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
+.tile-plot .plot-box { aspect-ratio: 1 / 1; }
+.tile-cap { padding: 8px 11px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tile-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tile-top b { font-size: 1.06em; font-weight: 650; }
+.tile-phi { font-size: 0.86em; color: var(--ink-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-height: 1.5em; }
+.tile-acc, .mcell .acc { font-size: 0.86em; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tile-acc .raw { color: var(--muted); }
+.tile-acc .arr { margin: 0 5px; color: var(--muted); }
+.tile-acc b { color: var(--ink); font-weight: 650; }
+.tile-acc .d { margin-left: 8px; color: var(--muted); }
+.finale-link {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 28px; padding: 16px 18px;
+  text-decoration: none; color: inherit; border-left: 4px solid var(--ink);
+}
+.finale-link b { font-size: 1.25em; }
+.finale-link span:last-child { color: var(--ink-2); }
+.finale-link:hover { border-color: var(--ink-2); background: var(--wash); }
+
+/* ---------- one exhibit ---------- */
+.exhibit { padding: 12px 18px 24px; max-width: 1500px; margin: 0 auto; }
+.ex-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 10px; }
+.ex-nav .where { font-size: 0.85em; color: var(--ink-2); }
+.ex-nav .spacer { flex: 1; }
+/* The plot is a square as large as the screen height allows; the text column takes the rest. */
+.exhibit { --stage: max(340px, min(calc(100vh - 52px - 262px), calc(100vw - 36px - 16px - 26px - 400px))); }
+.ex-grid { display: grid; grid-template-columns: auto minmax(360px, 640px); justify-content: center; gap: 16px; align-items: start; }
+.stage { display: flex; flex-direction: column; gap: 8px; }
+.stage .plot-title { margin: 0; flex-wrap: wrap; }
+.stage .plot-title b { font-size: 1.05em; }
+.stage .plot-title .sub { color: var(--ink-2); }
+.stage-wrap { width: var(--stage); height: var(--stage); }
+.stage-wrap .plot-box { width: 100%; height: 100%; aspect-ratio: auto; }
+.morph-ctl { display: grid; grid-template-columns: auto auto minmax(80px, 1fr) auto; align-items: center; gap: 10px; }
+.morph-ctl .play { min-width: 128px; padding: 7px 12px; font-weight: 650; font-size: 0.95em; }
+.morph-ctl .end { font-size: 0.82em; color: var(--ink-2); white-space: nowrap; }
+.morph-ctl input.morph { width: 100%; margin: 0; accent-color: var(--ink); height: 24px; }
+.stage-opts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; }
+.stage-opts .opts { display: flex; gap: 14px; font-size: 0.85em; color: var(--ink-2); }
+.stage-opts .opts label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
+.stage-opts .opts input { accent-color: var(--ink); margin: 0; }
+.stage-opts .legend { margin-top: 0; }
+
+.ex-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ex-title h1 { font-size: 2.1em; line-height: 1.1; margin: 2px 0 6px; font-weight: 700; }
+.ex-title .lead { font-size: 1.04em; margin: 0; color: var(--ink-2); }
+.phi-big { font-size: 1.12em; overflow-x: auto; overflow-y: hidden; }
+.phi-big .katex-display { margin: 4px 0 8px; }
+.how { font-size: 0.92em; margin: 0; }
+.eq-row { margin-bottom: 8px; }
+.eq-row .lab { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.eq-row .math { overflow-x: auto; overflow-y: hidden; padding: 2px 0; font-size: 1.05em; }
+.eq-row .note { font-size: 0.86em; color: var(--ink-2); }
+.eqs > .hint { margin: 0; }
+.accrow { display: grid; grid-template-columns: minmax(0, 1fr) 62px; grid-template-areas: "lab lab" "track val"; gap: 2px 10px; align-items: center; margin-bottom: 8px; }
+.accrow .lab { grid-area: lab; font-size: 0.88em; }
+.accrow .track { grid-area: track; position: relative; height: 14px; background: var(--wash); border-radius: 7px; }
+.accrow .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px; background: var(--axis); }
+.accrow.phi .fill { background: var(--primary); }
+.accrow .chance { position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 2px dotted var(--ink-2); }
+.accrow .val { grid-area: val; text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+.accrow.raw .val { color: var(--ink-2); font-weight: 500; }
+.accbars .hint { margin: 2px 0 0; }
+.knob .ctl { margin-top: 0; }
+.knob-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+/* ---------- finale ---------- */
+.mscroll { overflow-x: auto; padding-bottom: 6px; }
+.mgrid { display: grid; grid-template-columns: 190px repeat(6, minmax(110px, 1fr)); gap: 8px; align-items: stretch; min-width: 900px; }
+.mcorner { display: flex; align-items: flex-end; }
+.mhead { text-align: center; font-weight: 650; align-self: end; padding-bottom: 2px; }
+.mrow-head { display: flex; flex-direction: column; justify-content: center; gap: 4px; font-size: 0.86em; min-width: 0; overflow-x: auto; }
+.mrow-head a { color: var(--ink-2); font-size: 0.92em; }
+.mrow-head.generic, .mcell.generic { margin-top: 14px; }
+.mcell {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 5px; cursor: default;
+  display: flex; flex-direction: column; gap: 3px; outline: none;
+}
+.mcell .plot-box { aspect-ratio: 1 / 1; border-radius: 4px; overflow: hidden; }
+.mcell .acc { text-align: center; }
+.mcell .acc .d { color: var(--muted); }
+.mcell.good .acc { color: var(--good); font-weight: 650; }
+.mcell.best { border-color: var(--good); box-shadow: 0 0 0 2px var(--good); }
+.mcell:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
+.takeaways { margin-top: 22px; }
+.takeaways ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; max-width: 90ch; }
+
+/* ---------- smaller screens ---------- */
+@media (max-width: 1100px) {
+  .app-header .brand small { display: none; }
+}
+@media (max-width: 860px) {
+  .ex-grid { grid-template-columns: minmax(0, 1fr); }
+  .stage-wrap { width: auto; height: auto; }
+  .stage-wrap .plot-box { width: 100%; height: auto; aspect-ratio: 1 / 1; }
+  .hall, .match { padding: 16px 16px 40px; }
+  .exhibit { padding: 10px 12px 24px; }
+  .morph-ctl { grid-template-columns: auto minmax(0, 1fr); }
+  .morph-ctl .end { display: none; }
+}
+@media (max-width: 560px) {
+  .app-header .nav-hall, .stage .plot-title .hint { display: none; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile-acc .d, .mcell .acc .d { display: none; }
+  .mgrid { grid-template-columns: 120px repeat(6, 96px); min-width: 0; gap: 6px; }
+  .mrow-head { font-size: 0.78em; }
+  .ex-nav a.btn:not(:first-child) { font-size: 0.85em; }
+}

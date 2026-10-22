@@ -9,7 +9,7 @@
 import { makeSplit, DATASETS } from './datasets.js';
 import { prepare, makeTrainer, evaluate, viewFor } from './fit.js';
 import { foldWeights, TRANSFORMS, resolveParams } from './features.js';
-import { evalGrid } from './plot2d.js';
+import { evalGrid, theme } from './plot2d.js';
 import { marchingSquares } from './geometry.js';
 import { tex, fmt, pct } from './ui.js';
 import { logits } from './model.js';
@@ -234,9 +234,9 @@ export class Scene {
     let feats = '';
     for (let k = 0; k < show; k++) feats += `<br>${tex(fmap.columns[k].tex)} = ${fmt(row[k], 3)}`;
     if (d > show) feats += `<br><span class="k">… ${d - show} more features</span>`;
-    const p = 1 / (1 + Math.exp(-s));
+    const p = 1 / (1 + Math.exp(-s)), [n0, n1] = theme().names;
     return `${xs}<div class="sep"></div><span class="k">z = Φ(x):</span>${feats}<div class="sep"></div>` +
-      `<span class="k">w₀ + wᵀz</span> = ${fmt(s, 3)}<br><span class="k">P(orange)</span> = ${pct(p)} → <b>${p >= 0.5 ? 'orange' : 'blue'}</b>` +
-      (near ? `<div class="sep"></div>${near.name} point, true class <b>${near.label ? 'orange' : 'blue'}</b>` : '');
+      `<span class="k">w₀ + wᵀz</span> = ${fmt(s, 3)}<br><span class="k">P(${n1})</span> = ${pct(p)} → <b>${p >= 0.5 ? n1 : n0}</b>` +
+      (near ? `<div class="sep"></div>${near.name} point, true class <b>${near.label ? n1 : n0}</b>` : '');
   }
 }

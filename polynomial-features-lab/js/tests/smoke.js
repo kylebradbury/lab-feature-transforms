@@ -17,9 +17,37 @@ const errors = [], log = [];
 let current = 'boot';
 let phase = 'main', confirmText = ''; // 'afterReset' once Reset lab has reloaded the page
 
-const KEYS = ['ftlab:poly:state', 'ftlab:poly:progress', 'ftlab:poly:last', 'ftlab:poly:view', 'ftlab:poly:helpSeen', 'ftlab:poly:answers', 'ftlab:poly:name'];
+const KEYS = ['ftlab:poly:state', 'ftlab:poly:progress', 'ftlab:poly:last', 'ftlab:poly:view', 'ftlab:poly:helpSeen', 'ftlab:poly:answers', 'ftlab:poly:name', 'ftlab:theme'];
 const backup = Object.fromEntries(KEYS.map((k) => [k, localStorage.getItem(k)]));
 const restore = () => KEYS.forEach((k) => (backup[k] === null ? localStorage.removeItem(k) : localStorage.setItem(k, backup[k])));
+
+// ?theme=<name> runs everything (including the contrast checks) on another color theme.
+const themeParam = params.get('theme');
+frame.src = `index.html${themeParam ? `?theme=${encodeURIComponent(themeParam)}` : ''}#blobs`;
+
+// WCAG contrast checks on the active theme's colors (css/themes/): text, then
+// points and lines against both shaded regions and the neutral shade. The
+// class-1 outline is a style choice (white in the brand theme) and not checked.
+function contrastChecks(win, mode, check) {
+  const cs = win.getComputedStyle(win.document.documentElement), v = (n) => cs.getPropertyValue(n).trim();
+  const rgb = (c) => (c.startsWith('#') ? [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) : c.match(/[\d.]+/g).slice(0, 3).map(Number));
+  const lum = (c) => {
+    const [r, g, b] = rgb(c).map((x) => { x /= 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const [hi, lo] = [lum(v(a)), lum(v(b))].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+  const lstar = (c) => { const Y = lum(v(c)); return 116 * (Y > 0.008856 ? Math.cbrt(Y) : 7.787 * Y + 16 / 116) - 16; };
+  const rules = [['--ink', '--surface', 7], ['--ink', '--page', 7], ['--ink-2', '--surface', 7], ['--muted', '--surface', 4.5], ['--muted', '--page', 4.5],
+    ['--good', '--surface', 4.5], ['--on-primary', '--primary', 4.5], ['--fit', '--surface', 4.5]];
+  for (const bg of ['--region0', '--region1', '--heat-mid']) rules.push(['--class0', bg, 3], ['--ink', bg, 3], ['--fit', bg, 3]);
+  for (const [a, b, min] of rules) {
+    const q = ratio(a, b);
+    check(q >= min, `${mode}: ${a} on ${b} is ${q.toFixed(2)}:1, needs ${min}:1`);
+  }
+  const dl = Math.abs(lstar('--region0') - lstar('--region1'));
+  check(dl >= 10, `${mode}: the two region shades differ by ${dl.toFixed(1)} lightness units, need 10`);
+  return rules.length + 1;
+}
 
 frame.addEventListener('load', async () => {
   const w = frame.contentWindow, doc = w.document;
@@ -72,6 +100,8 @@ frame.addEventListener('load', async () => {
       }
       if (params.get('reveal') !== '0') btn(/Reveal best fit/).click();
       await sleep(400);
+      if (params.get('mode') && params.get('mode') !== doc.documentElement.dataset.theme) { btn(/Theme/).click(); await sleep(200); }
+      if (params.get('solid') === '1') { doc.querySelectorAll('.xcard .opts input')[1].click(); await sleep(200); }
       app.fitZ(); await sleep(60);
       log.push(`shot ${shot}: feature-space plot ${Math.round(doc.querySelector('.zbox').getBoundingClientRect().height)}px, column ${doc.querySelector('.col.mid').clientHeight}px`);
       if (params.get('answers') === '1') app.showAnswers();
@@ -81,6 +111,8 @@ frame.addEventListener('load', async () => {
       restore();
       out.hidden = true;
       document.body.classList.add('shot');
+      const sim = params.get('sim'); // how the page looks with a color-vision deficiency, or in grayscale
+      if (sim) frame.style.filter = sim === 'gray' ? 'grayscale(1)' : `url(#${sim})`;
     }
     out.textContent = `${errors.length ? 'FAIL' : 'PASS'} poly smoke (${errors.length} errors)\n\n${log.join('\n')}\n\n${errors.join('\n')}`;
     document.title = errors.length ? 'FAIL' : 'PASS';
@@ -225,6 +257,15 @@ frame.addEventListener('load', async () => {
   btn(/Theme/).click(); await sleep(120); btn(/Theme/).click(); await sleep(120);
   doc.querySelectorAll('.xcard .opts input').forEach((el) => { el.click(); el.click(); });
   await sleep(400); // let the lab's debounced save land before restoring
+
+  // contrast of the theme's colors, in light and dark mode
+  current = 'contrast';
+  const mode = () => doc.documentElement.dataset.theme;
+  let nChecks = contrastChecks(w, mode(), check);
+  btn(/Theme/).click(); await sleep(150);
+  nChecks += contrastChecks(w, mode(), check);
+  btn(/Theme/).click(); await sleep(150);
+  log.push(`contrast: ${nChecks} checks on the ${themeParam || 'default'} theme, light and dark`);
 
   // Reset lab: declining changes nothing; confirming wipes the lab and reloads
   // the page, which runs this handler again (phase 'afterReset' above).

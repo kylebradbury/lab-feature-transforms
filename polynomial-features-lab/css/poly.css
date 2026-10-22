@@ -1,22 +1,17 @@
 /* Polynomial Features Lab — one-screen layout on top of lab.css: equation bar,
    big original-space plot, feature-space view + weights chart, controls. */
 
+/* Colors come from the theme file (css/themes/); this file only uses them. */
 :root {
-  --fit: #6a3fd0;
-  --hl: rgba(255, 190, 0, 0.3);
   --mid-w: clamp(250px, 23vw, 340px);
   --side-w: clamp(300px, 25vw, 370px);
   --eqbar-h: 72px;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --fit: #b39dff; --hl: rgba(255, 205, 60, 0.22); }
-}
-:root[data-theme="dark"] { --fit: #b39dff; --hl: rgba(255, 205, 60, 0.22); }
 
 body.poly { min-height: 100vh; display: flex; flex-direction: column; }
 body.poly #app { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 body.poly [hidden] { display: none !important; }
-body.poly .app-header { position: static; }
+body.poly .app-header { position: static; box-shadow: inset 0 4px 0 var(--header-stripe); }
 .app-header a.icon-btn { text-decoration: none; }
 .stepper { display: flex; align-items: center; gap: 6px; margin-left: 18px; min-width: 0; }
 .stepper .btn { padding: 2px 9px; }
@@ -36,8 +31,8 @@ body.poly .app-header { position: static; }
 .eq-fit.long { font-size: 0.95em; }
 .eq-main .op, .eq-fit .op { padding: 0 0.22em; }
 .term { display: inline-flex; flex-direction: column; align-items: center; padding: 1px 4px 2px; border-radius: 6px; transition: background-color 0.15s; }
-.term .wlab { font-size: 0.42em; color: var(--muted); line-height: 1; margin-top: 3px; font-variant-numeric: tabular-nums; }
-.term.zero > .katex { opacity: 0.4; }
+.term .wlab { font-size: 0.5em; color: var(--muted); line-height: 1; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.term.zero { color: var(--muted); } /* zero weights: de-emphasized but still readable */
 .term.hl { background: var(--hl); }
 .shape { flex: none; font-size: 0.8em; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); white-space: nowrap; }
 .shape b { color: var(--ink); font-weight: 600; }
@@ -70,6 +65,9 @@ body.poly .app-header { position: static; }
 .plot-title .opts label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
 .plot-title .opts input { accent-color: var(--ink); margin: 0; }
 .legend .sw.ring { background: transparent; border: 1.5px solid var(--ink); border-radius: 50%; width: 12px; height: 12px; }
+.legend .sw.circle { border-radius: 50%; }
+.legend .sw.square { border-radius: 1px; }
+.legend .sw.c1 { box-shadow: 0 0 0 1px var(--class1-edge); }
 .legend .sw.fitline { height: 0; width: 18px; border-top: 3px dashed var(--fit); vertical-align: 3px; }
 
 /* ---------- feature-space view ---------- */

@@ -22,25 +22,35 @@ function parseColor(s) {
 export function refreshTheme() {
   const cs = getComputedStyle(document.documentElement);
   const g = (n) => cs.getPropertyValue(n).trim();
+  const word = (n, fallback) => g(n).replace(/["']/g, '').trim() || fallback;
   const dark = g('color-scheme').includes('dark');
   THEME = {
     dark, surface: g('--surface'), ink: g('--ink'), ink2: g('--ink-2'), muted: g('--muted'), grid: g('--grid'), axis: g('--axis'),
     c0: g('--class0'), c1: g('--class1'), mid: g('--heat-mid'),
+    // per-class point style and the class names used in text (see css/themes/)
+    edge0: g('--class0-edge') || g('--surface'), edge1: g('--class1-edge') || g('--surface'),
+    edgeW: parseFloat(g('--point-edge-width')) || 1.5,
+    shape0: word('--class0-shape', 'circle'), shape1: word('--class1-shape', 'square'),
+    names: [word('--class0-name', 'class 0'), word('--class1-name', 'class 1')],
   };
-  THEME.rgb = { surface: parseColor(THEME.surface), c0: parseColor(THEME.c0), c1: parseColor(THEME.c1), mid: parseColor(THEME.mid) };
+  const rgb = { surface: parseColor(THEME.surface), c0: parseColor(THEME.c0), c1: parseColor(THEME.c1), mid: parseColor(THEME.mid) };
+  // Confident-region shading: the theme's --region0/1, else a tint of each class color.
+  const strength = dark ? 0.5 : 0.42;
+  rgb.r0 = g('--region0') ? parseColor(g('--region0')) : mix(rgb.surface, rgb.c0, strength);
+  rgb.r1 = g('--region1') ? parseColor(g('--region1')) : mix(rgb.surface, rgb.c1, strength);
+  THEME.rgb = rgb;
   LUTS.clear();
   return THEME;
 }
 export const theme = () => THEME || refreshTheme();
 
 const mix = (a, b, t) => [0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * t));
-// 256-entry RGB lookup from p = σ(logit): blue tint → neutral gray → orange tint.
+// 256-entry RGB lookup from p = σ(logit): class-0 region → neutral (p = 0.5) → class-1 region.
 function lut(mode) {
   const key = mode;
   if (LUTS.has(key)) return LUTS.get(key);
   const T = theme(), out = new Uint8ClampedArray(256 * 3);
-  const strength = T.dark ? 0.5 : 0.42;
-  const pole0 = mix(T.rgb.surface, T.rgb.c0, strength), pole1 = mix(T.rgb.surface, T.rgb.c1, strength);
+  const pole0 = T.rgb.r0, pole1 = T.rgb.r1;
   for (let k = 0; k < 256; k++) {
     const p = k / 255, t = Math.abs(p - 0.5) * 2;
     let c;
@@ -146,13 +156,14 @@ export class XPlot {
   }
 
   drawHeat(grid, shade = 'prob') {
-    const { G, V, Gy = G } = grid, L = lut(shade), img = new ImageData(G, Gy), px = img.data;
+    const { G, V, Gy = G } = grid, L = lut(shade), img = new ImageData(G, Gy), px = img.data, mid = theme().rgb.mid;
     for (let j = 0; j < Gy; j++) {
       const row = Gy - 1 - j;
       for (let i = 0; i < G; i++) {
-        const v = V[j * G + i];
-        const p = Number.isFinite(v) ? 1 / (1 + Math.exp(-v)) : 0.5;
-        const k = Math.round(p * 255) * 3, o = 4 * (row * G + i);
+        const v = V[j * G + i], o = 4 * (row * G + i);
+        // No value (e.g. a spot no data point can reach): neutral, never a class color.
+        if (!Number.isFinite(v)) { px[o] = mid[0]; px[o + 1] = mid[1]; px[o + 2] = mid[2]; px[o + 3] = 255; continue; }
+        const k = Math.round((1 / (1 + Math.exp(-v))) * 255) * 3;
         px[o] = L[k]; px[o + 1] = L[k + 1]; px[o + 2] = L[k + 2]; px[o + 3] = 255;
       }
     }
@@ -237,13 +248,14 @@ export class XPlot {
       if (px < -10 || py < -10 || px > this.cssW + 10 || py > this.cssH + 10) continue;
       const col = pts.y[i] ? T.c1 : T.c0;
       c.beginPath();
-      if (pts.y[i]) c.rect(px - r * 0.9, py - r * 0.9, 1.8 * r, 1.8 * r);
+      if ((pts.y[i] ? T.shape1 : T.shape0) === 'square') c.rect(px - r * 0.9, py - r * 0.9, 1.8 * r, 1.8 * r);
       else c.arc(px, py, r, 0, 2 * Math.PI);
       if (pts.hollow) {
         c.fillStyle = T.surface; c.fill();
         c.lineWidth = 2 * Math.min(1, s); c.strokeStyle = col; c.stroke();
       } else {
-        c.lineWidth = 1.5 * Math.min(1, s); c.strokeStyle = T.surface; c.stroke();
+        // edge first, then fill: the outer half of the edge shows as an outline
+        c.lineWidth = T.edgeW * Math.min(1, s); c.strokeStyle = pts.y[i] ? T.edge1 : T.edge0; c.stroke();
         c.fillStyle = col; c.fill();
       }
       if (pts.mistakes && pts.mistakes[i]) {

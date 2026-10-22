@@ -84,6 +84,16 @@ function challengeCfg(c) {
   modelCfg(c);
 }
 
+// ---------- theme ----------
+
+// Colors, point shapes and the class names used in text all come from the
+// theme stylesheet (css/themes/); read them once before building the page.
+const T0 = refreshTheme();
+const NAME = T0.names; // e.g. ['gray', 'green']
+const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+// Challenge text writes class colors as {c0}/{c1} ({C0}/{C1} capitalized).
+const named = (text) => text.replace(/\{([cC])([01])\}/g, (m, c, k) => (c === 'C' ? cap(NAME[+k]) : NAME[+k]));
+
 // ---------- shell: header + equation bar ----------
 
 const root = document.getElementById('app');
@@ -120,7 +130,7 @@ const fitRow = h('div', { class: 'eqrow fit', hidden: true },
   h('div', { class: 'tag' }, 'Best fit', h('small', {}, 'logistic regression')), h('span', { class: 'fit-key', 'aria-hidden': 'true' }), eqFit);
 const accFit = h('div', { class: 'accbox fit', hidden: true });
 const eqbar = h('section', { class: 'eqbar', 'aria-label': 'Decision boundary equation' },
-  h('div', { class: 'eqrow you' }, h('div', { class: 'tag' }, 'Your boundary', h('small', {}, 'orange where > 0')), eqYou, shapeEl),
+  h('div', { class: 'eqrow you' }, h('div', { class: 'tag' }, 'Your boundary', h('small', {}, `${NAME[1]} where > 0`)), eqYou, shapeEl),
   h('div', { class: 'accbox' }, h('div', { class: 'tag' }, 'Training accuracy'), accBig, accGoal),
   fitRow, accFit);
 
@@ -139,7 +149,7 @@ const xcard = h('section', { class: 'card plot-card xcard' },
       h('label', { title: 'Shade by predicted class instead of probability' }, solidToggle, 'solid regions'))),
   h('div', { class: 'xwrap' }, xbox),
   h('div', { class: 'legend' },
-    h('span', {}, h('span', { class: 'sw c0' }), 'class 0 (blue)'), h('span', {}, h('span', { class: 'sw c1' }), 'class 1 (orange)'),
+    h('span', {}, h('span', { class: `sw c0 ${T0.shape0}` }), `class 0 (${NAME[0]})`), h('span', {}, h('span', { class: `sw c1 ${T0.shape1}` }), `class 1 (${NAME[1]})`),
     h('span', {}, h('span', { class: 'sw ring' }), 'misclassified'), h('span', {}, h('span', { class: 'sw line' }), 'your boundary'), xLegendFit));
 
 // ---------- feature-space view ----------
@@ -169,7 +179,7 @@ for (let k = 0; k <= NT; k++) {
 const wLegendBest = h('span', { hidden: true }, h('span', { class: 'sw best' }), 'best fit');
 const wcard = h('section', { class: 'card plot-card wcard' },
   h('div', { class: 'plot-title' }, h('b', {}, 'Relative weights'), h('span', { title: 'Each set of weights is divided by its own largest |w|' }, '÷ largest |w|')),
-  wbars, h('div', { class: 'legend' }, h('span', {}, h('span', { class: 'sw you' }), 'yours (orange +, blue −)'), wLegendBest));
+  wbars, h('div', { class: 'legend' }, h('span', {}, h('span', { class: 'sw you' }), `yours (${NAME[1]} +, ${NAME[0]} −)`), wLegendBest));
 
 // ---------- challenge card ----------
 
@@ -245,7 +255,6 @@ root.append(header, eqbar, h('main', { class: 'workspace' },
 
 // ---------- plots + scene ----------
 
-refreshTheme();
 const fitColor = () => getComputedStyle(document.documentElement).getPropertyValue('--fit').trim() || '#6a3fd0';
 let FIT = fitColor();
 const xplot = new XPlot(xbox, { outerLabels: true });
@@ -356,8 +365,15 @@ function renderZ(sc, b) {
       X[2 * i] = u; X[2 * i + 1] = v;
       lo[0] = Math.min(lo[0], u); hi[0] = Math.max(hi[0], u); lo[1] = Math.min(lo[1], v); hi[1] = Math.max(hi[1], v);
     }
-    const pad = (k) => Math.max(0.25, 0.08 * (hi[k] - lo[k]));
-    zc = { key, X, view: { xmin: lo[0] - pad(0), xmax: hi[0] + pad(0), ymin: lo[1] - pad(1), ymax: hi[1] + pad(1) } };
+    // Axes span exactly what each feature takes over the original plot's box
+    // (e.g. x₁² from 0 to 9), so there is no margin beyond the data's space.
+    const xv = sc.displayView();
+    for (let j = 0; j <= 60; j++) for (let i = 0; i <= 60; i++) {
+      const x1 = xv.xmin + (i / 60) * (xv.xmax - xv.xmin), x2 = xv.ymin + (j / 60) * (xv.ymax - xv.ymin);
+      const u = TERMS[a].f(x1, x2), v = TERMS[c].f(x1, x2);
+      lo[0] = Math.min(lo[0], u); hi[0] = Math.max(hi[0], u); lo[1] = Math.min(lo[1], v); hi[1] = Math.max(hi[1], v);
+    }
+    zc = { key, X, view: { xmin: lo[0], xmax: hi[0], ymin: lo[1], ymax: hi[1] } };
   }
   const mask = activeMask(), w = effW();
   // The boundary is exactly a line in this plane iff no other active term has weight.
@@ -384,7 +400,7 @@ function renderZ(sc, b) {
   const bLines = b && !bGrid ? mapContour(b.segs, b.G, xv, a, c) : null;
   zplot.setView(zc.view);
   zplot.axisLabels = [TERMS[a].label, TERMS[c].label];
-  zplot.onHover = (u, v, near) => `${TERMS[a].label} = ${fmt(u)}<br>${TERMS[c].label} = ${fmt(v)}${near ? `<div class="sep"></div>training point, class <b>${near.label ? 'orange' : 'blue'}</b>` : ''}`;
+  zplot.onHover = (u, v, near) => `${TERMS[a].label} = ${fmt(u)}<br>${TERMS[c].label} = ${fmt(v)}${near ? `<div class="sep"></div>training point, class <b>${near.label ? NAME[1] : NAME[0]}</b>` : ''}`;
   const ySegs = grid ? marchingSquares(grid.V, grid.G) : null;
   zplot.render({
     grid: shading, shade: view.shade,
@@ -644,7 +660,7 @@ function syncActions() {
   nextChallengeBtn.classList.toggle('primary', submitted && !last);
   compare.hidden = !S.revealed;
   xLegendFit.hidden = !S.revealed;
-  insightEl.innerHTML = ch().insight;
+  insightEl.innerHTML = named(ch().insight);
 }
 function syncGoal() {
   const c = ch(), p = progress[c.id], b = p && p.best, met = b != null && b >= c.goal - 1e-9, a = answers[c.id];
@@ -665,8 +681,8 @@ function syncChallenge() {
   kicker.textContent = `Challenge ${idx + 1} of ${CHALLENGES.length}`;
   chName.textContent = c.name;
   chHard.hidden = !c.hard;
-  chBrief.innerHTML = c.brief;
-  chHintBody.innerHTML = c.hint;
+  chBrief.innerHTML = named(c.brief);
+  chHintBody.innerHTML = named(c.hint);
   chHint.open = false;
   prevBtn.disabled = idx === 0;
   nextBtn.disabled = idx === CHALLENGES.length - 1;
@@ -879,10 +895,14 @@ themeBtn.addEventListener('click', () => {
   store('theme', next);
   redrawAll();
 });
-mq.addEventListener('change', redrawAll);
+// With no saved choice, follow the system setting as it changes.
+mq.addEventListener('change', () => {
+  if (!store('theme')) document.documentElement.dataset.theme = mq.matches ? 'dark' : 'light';
+  redrawAll();
+});
 
 const HELP = `
-<p>The model is <b>logistic regression</b>: \\(P(\\text{orange}\\mid x) = \\sigma(w_0 + w_1z_1 + \\dots + w_dz_d)\\). The features \\(z\\) are the raw inputs \\(x_1, x_2\\) or, once you switch, the degree-2 terms \\(x_1, x_2, x_1^2, x_1x_2, x_2^2\\). The boundary is where \\(w_0 + w^\\top z = 0\\); the bar at the top always shows yours.</p>
+<p>The model is <b>logistic regression</b>: \\(P(\\text{${NAME[1]}}\\mid x) = \\sigma(w_0 + w_1z_1 + \\dots + w_dz_d)\\). The features \\(z\\) are the raw inputs \\(x_1, x_2\\) or, once you switch, the degree-2 terms \\(x_1, x_2, x_1^2, x_1x_2, x_2^2\\). The boundary is where \\(w_0 + w^\\top z = 0\\); the bar at the top always shows yours.</p>
 <ol>
   <li><b>Set the weights by hand.</b> Drag the sliders or type values to get the highest <b>training accuracy</b> you can. Ringed points are the ones your boundary gets wrong.</li>
   <li><b>Add polynomial features</b> at any time with <i>Polynomial, degree 2</i> (challenges 8 and 9, marked ★, are extra challenging: they also offer <i>Degree 3</i>, \\(x_1^3, x_1^2x_2, x_1x_2^2, x_2^3\\), whose sliders have a finer ±1 range because cubes grow fast). Untick terms to use only some of them. Each challenge opens on the raw features with the best fit hidden; your polynomial weights are kept for when you switch back.</li>

@@ -40,22 +40,23 @@ export const ALL = upTo(3);
 export const STAGES = [{ id: 'raw', deg: 1 }, { id: 'poly', deg: 2 }, { id: 'cubic', deg: 3 }];
 export const stageDeg = (id) => STAGES.find((st) => st.id === id).deg;
 
-const START = [0, 0, 1]; // x₂ = 0, orange above
+const START = [0, 0, 1]; // x₂ = 0, class 1 above
 
 /**
  * Each challenge: dataset + seed, a training-accuracy goal that can be reached
  * by hand (`hand` is a slider-reachable solution, checked by the tests), the
  * degree that solution needs (`need`) and the highest degree offered (`maxDeg`,
  * default 2), whether it is marked extra challenging (`hard`), and text shown
- * before (brief, hint) and after (insight) revealing the best fit. Weight lists
- * may stop early; missing weights are 0.
+ * before (brief, hint) and after (insight) revealing the best fit. Text names
+ * the class colors as {c0}/{c1} ({C0}/{C1} capitalized), filled in from the
+ * color theme. Weight lists may stop early; missing weights are 0.
  */
 export const CHALLENGES = [
   {
     id: 'blobs', name: 'Two blobs', ds: 'blobs', params: { sep: 3.4, angle: -35, noise: 0.6 }, seed: 7301,
     goal: 1, need: 1, start: START, hand: [0, 1.65, -1.15, 0, 0, 0],
     brief: 'Warm-up with the raw features. Turn and slide the line until every point is on its own color’s side.',
-    hint: 'The vector (w₁, w₂) points toward the orange side, so it sets the line’s tilt. w₀ slides the line along that direction.',
+    hint: 'The vector (w₁, w₂) points toward the {c1} side, so it sets the line’s tilt. w₀ slides the line along that direction.',
     insight: 'Any separating line gets 100%. Logistic regression picks the one with the lowest cross-entropy, which pushes points far from the line. Its weights are large because only their <b>ratios</b> place the line; their <b>size</b> sets how quickly the probability goes from 0 to 1.',
   },
   {
@@ -68,7 +69,7 @@ export const CHALLENGES = [
   {
     id: 'bullseye', name: 'Bullseye', ds: 'circles', params: {}, seed: 7103,
     goal: 0.98, need: 2, start: START, hand: [1.8, 0, 0, -1, 0, -1],
-    brief: 'Orange in the middle, blue all around. Try a line first, then switch to <b>polynomial features</b>.',
+    brief: '{C1} in the middle, {c0} all around. Try a line first, then switch to <b>polynomial features</b>.',
     hint: 'x₁² + x₂² is the squared distance from the origin, so r² − x₁² − x₂² = 0 is a circle of radius r. In feature space, put x₁² and x₂² on the axes.',
     insight: 'Plot x₁² against x₂²: the classes are split by a straight line. A circle in the original space is a flat cut in feature space. The best fit puts almost no weight on x₁, x₂ or x₁x₂.',
   },
@@ -82,7 +83,7 @@ export const CHALLENGES = [
   {
     id: 'xor', name: 'XOR', ds: 'xor', params: {}, seed: 7105,
     goal: 0.98, need: 2, start: START, hand: [0, 0, 0, 0, 1, 0],
-    brief: 'Orange in two opposite quadrants. No line, circle or ellipse can do this.',
+    brief: '{C1} in two opposite quadrants. No line, circle or ellipse can do this.',
     hint: 'The product x₁x₂ is positive in quadrants I and III and negative in II and IV. Try putting x₁x₂ on a feature-space axis.',
     insight: 'One feature does it: x₁x₂. On an x₁x₂ axis the classes split at 0. An interaction term means “the effect of x₁ depends on x₂”, which is exactly the XOR pattern.',
   },
@@ -111,7 +112,7 @@ export const CHALLENGES = [
     id: 'moons3', name: 'Moons, again', ds: 'moons', params: { noise: 0.2 }, seed: 7108,
     goal: 0.96, need: 3, maxDeg: 3, hard: true, start: START, hand: [0, -1, -1, 0, 0, 0, 0.32],
     brief: 'The same two moons as challenge 7, but now you can use degree 3. Can an S-shaped boundary slip between the crescents?',
-    hint: 'Use the idea from the S-curve: x₁, x₂ and x₁³. Here orange is <i>below</i> the curve, so start with w₂ = −1, then tilt it with w₁ and bend it with w₆.',
+    hint: 'Use the idea from the S-curve: x₁, x₂ and x₁³. Here {c1} is <i>below</i> the curve, so start with w₂ = −1, then tilt it with w₁ and bend it with w₆.',
     insight: 'With x₁³ the boundary bends twice and threads between both crescents: the best fit reaches 100% where degree 2 got 88.7%. x₁, x₂ and x₁³ alone are enough; untick the rest and reveal again. Extra degree is not free, though: with more terms, a boundary can also start bending around noise.',
   },
 ];
