@@ -1,0 +1,133 @@
+/* Still a Linear Model: three panels, the controls, the weights and the model.
+   Builds on lab.css (cards, buttons, header); colors come from css/themes/.
+   (lab.css already styles .tabs and .gallery, so the case list is .cases.) */
+
+body.sl { min-height: 100vh; }
+body.sl [hidden] { display: none !important; }
+body.sl .app-header { box-shadow: inset 0 4px 0 var(--header-stripe); }
+.app-header a.brand { text-decoration: none; }
+
+/* The plots are as tall as the screen allows with the controls, the sliders
+   and the first equation still on screen below them. */
+.still {
+  max-width: 1560px; margin: 0 auto; padding: 10px 18px 28px;
+  display: flex; flex-direction: column; gap: 10px;
+  --ph: clamp(240px, calc(100vh - 500px), 470px);
+}
+.intro .lead { margin: 0; color: var(--ink-2); max-width: 132ch; }
+.intro .lead b { color: var(--ink); }
+
+.cases { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cases .lab { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); font-weight: 600; margin-right: 4px; }
+.case {
+  padding: 4px 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+  text-decoration: none; font-weight: 550; font-size: 0.94em; white-space: nowrap;
+}
+.case:hover { background: var(--wash); }
+.case[aria-current="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.case .phi { font-weight: 400; color: var(--muted); margin-left: 6px; font-size: 0.86em; }
+.case[aria-current="true"] .phi { color: inherit; opacity: 0.75; }
+
+/* ---------- the three panels ---------- */
+.panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.panel { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; min-width: 0; }
+.panel .plot-title { margin: 0; align-items: baseline; flex-wrap: wrap; justify-content: flex-start; gap: 2px 8px; }
+.panel .plot-title .sub { color: var(--ink-2); }
+.pwrap { position: relative; height: var(--ph); }
+.pwrap .plot-box { height: 100%; aspect-ratio: auto; }
+/* the 2-D plot keeps equal units on both axes (its axis margins are 54 × 46 px) */
+.pwrap.square { display: flex; align-items: center; justify-content: center; }
+.pwrap.square .plot-box { height: auto; width: min(100%, calc(var(--ph) * 1.02)); aspect-ratio: 1.02 / 1; }
+/* Plotly sizes its own canvases: not a .plot-box, whose canvases lab.css stretches */
+.plot3d { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.plot3d.loading { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.9em; }
+.panel .cap { margin: 0; min-height: 34px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; font-size: 0.8em; color: var(--ink-2); }
+.panel .cap .legend { margin: 0; font-size: 1em; }
+.legend .sw.circle { border-radius: 50%; }
+.legend .sw.square { border-radius: 1px; }
+.legend .sw.c1 { box-shadow: 0 0 0 1px var(--class1-edge); }
+.legend .sw.r0 { background: var(--region0); border: 1px solid var(--border); }
+.legend .sw.r1 { background: var(--region1); border: 1px solid var(--border); }
+.legend .sw.zp { background: var(--wash); border: 1px solid var(--ink-2); }
+
+/* which floor the feature-space view stands on, and which way the morph runs */
+.space-badge {
+  position: absolute; left: 6px; top: 6px; z-index: 3; pointer-events: none; max-width: calc(100% - 12px);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 12px; font-weight: 650; line-height: 1.2; padding: 3px 8px; border-radius: 999px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.space-badge[data-space="z"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.space-badge[data-space="mid"] { font-style: italic; }
+.morph-ctl { display: grid; grid-template-columns: auto auto minmax(60px, 1fr) auto; align-items: center; gap: 8px; min-height: 34px; }
+.morph-ctl .play { min-width: 124px; padding: 5px 10px; font-weight: 650; }
+.morph-ctl .end { font-size: 0.82em; color: var(--ink-2); white-space: nowrap; }
+.morph-ctl input.morph { width: 100%; margin: 0; accent-color: var(--ink); height: 22px; }
+
+/* ---------- controls under the panels ---------- */
+.ctlbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.seg { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.seg .lab { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); font-weight: 600; margin-right: 4px; }
+.seg .btn { padding: 4px 11px; }
+.opt { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9em; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.opt input { accent-color: var(--ink); margin: 0; width: 15px; height: 15px; }
+/* fixed height: hovering a point must not move anything below it */
+.readout {
+  flex: 1 1 420px; height: 2.9em; overflow: hidden; display: flex; align-items: center;
+  padding: 2px 12px; font-size: 0.88em; line-height: 1.4; font-variant-numeric: tabular-nums;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.readout .k { color: var(--ink-2); }
+.readout .sep { color: var(--muted); margin: 0 5px; }
+.readout .idle { color: var(--muted); }
+
+/* ---------- weights, the model, this case ---------- */
+.lower { display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.card-head h2 { font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); margin: 0 0 4px; font-weight: 600; }
+.btn.small { padding: 2px 9px; font-size: 0.82em; }
+/* one row per weight: name and value, then the slider */
+.weights .ctl { display: grid; grid-template-columns: 8.6em minmax(0, 1fr); align-items: center; gap: 10px; margin: 2px 0; }
+.weights .ctl input[type="range"] { margin: 0; }
+.acc-line { font-size: 0.86em; color: var(--ink-2); font-variant-numeric: tabular-nums; margin: 6px 0 0; }
+.acc-line b { color: var(--ink); }
+.weights .hint { margin: 6px 0 0; }
+
+.eq-row { margin-bottom: 6px; }
+.eq-row .lab { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.eq-row .math { overflow-x: auto; overflow-y: hidden; padding: 1px 0; font-size: 1.02em; }
+.eq-row .note { font-size: 0.86em; color: var(--ink-2); }
+.eq-row .katex-display { margin: 2px 0; text-align: left; }
+.eq-row .katex-display > .katex { text-align: left; }
+.eqs > .hint { margin: 4px 0 0; }
+
+.about .lead { margin: 0 0 8px; font-size: 0.92em; }
+.chosen { padding: 8px 10px; border-left: 3px solid var(--ink-2); background: var(--wash); border-radius: 0 6px 6px 0; font-size: 0.86em; }
+.chosen .katex { font-size: 1em; }
+.defs { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.84em; color: var(--ink-2); }
+.defs-title { font-size: 0.86em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.defs ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 3px; }
+.defs .katex { font-size: 1em; }
+
+.takeaways ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; max-width: 100ch; }
+
+.site-foot { text-align: center; color: var(--muted); font-size: 0.84em; padding: 18px 16px 26px; border-top: 1px solid var(--border); }
+.site-foot a { color: var(--ink-2); }
+
+/* ---------- smaller screens ---------- */
+@media (max-width: 1180px) {
+  .app-header .brand small { display: none; }
+  .lower { grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr); }
+  .lower .about { grid-column: 1 / -1; }
+}
+@media (max-width: 1000px) {
+  .still { --ph: clamp(240px, 42vw, 420px); }
+  .panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panels .panel:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 680px) {
+  .still { padding: 8px 12px 24px; --ph: min(calc(100vw - 50px), 420px); }
+  .panels, .lower { grid-template-columns: minmax(0, 1fr); }
+  .case .phi { display: none; }
+  .readout { height: 4.3em; }
+}

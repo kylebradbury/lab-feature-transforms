@@ -1,0 +1,85 @@
+/* Polynomial Features Lab color theme: "classic" (the original orange and blue).
+ *
+ * Saved exactly as the lab looked before the "brand" theme, so it can be
+ * switched back: in index.html change "brand" to "classic", or preview it with
+ * index.html?theme=classic. See brand.css for what each variable controls.
+ *
+ * Known accessibility shortfalls kept as they were: --muted text is 3.6:1
+ * (below 4.5:1), points have only a light outline, and the two region tints
+ * differ mainly in hue, not lightness. smoke.html reports these when run with
+ * ?theme=classic.
+ */
+
+/* ---------- light ---------- */
+:root {
+  color-scheme: light;
+
+  --surface: #fcfcfb;
+  --page: #f4f4f1;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.12);
+  --wash: rgba(11, 11, 11, 0.05);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  --class0-name: "blue";
+  --class1-name: "orange";
+  --class0: #2a78d6;
+  --class1: #eb6834;
+  --class0-shape: circle;
+  --class1-shape: square;
+  --class0-edge: #fcfcfb;
+  --class1-edge: #fcfcfb;
+  --point-edge-width: 1.5;
+  --region0: #a4c5eb;                   /* 42% of --class0 over --surface, as before */
+  --region1: #f5bea7;
+  --heat-mid: #f0efec;
+
+  --fit: #6a3fd0;
+  --primary: #0b0b0b;
+  --on-primary: #fcfcfb;
+  --good: #006300;
+  --bad: #d03b3b;
+  --hl: rgba(255, 190, 0, 0.3);
+  --header-stripe: transparent;
+}
+
+/* ---------- dark ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface: #1a1a19;
+  --page: #0d0d0d;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.12);
+  --wash: rgba(255, 255, 255, 0.06);
+  --shadow: none;
+
+  --class0-name: "blue";
+  --class1-name: "orange";
+  --class0: #3987e5;
+  --class1: #d95926;
+  --class0-shape: circle;
+  --class1-shape: square;
+  --class0-edge: #1a1a19;
+  --class1-edge: #1a1a19;
+  --point-edge-width: 1.5;
+  --region0: #2a517f;                   /* 50% of --class0 over --surface, as before */
+  --region1: #7a3a20;
+  --heat-mid: #383835;
+
+  --fit: #b39dff;
+  --primary: #f0efec;
+  --on-primary: #1a1a19;
+  --good: #0ca30c;
+  --bad: #e66767;
+  --hl: rgba(255, 205, 60, 0.22);
+  --header-stripe: transparent;
+}
