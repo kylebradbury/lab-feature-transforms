@@ -56,8 +56,7 @@ frame.addEventListener('load', async () => {
   const origErr = w.console.error.bind(w.console);
   w.console.error = (...a) => { errors.push(`${current}: ${a.map(String).join(' ')}`); origErr(...a); };
   await sleep(500);
-  const helpShown = !!doc.querySelector('.modal');
-  doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' })); // first-visit help
+  doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' })); // close any dialog
   const app = w.polylab;
   // Headless Chrome under --virtual-time-budget never fires requestAnimationFrame
   // (timers still run), so drive frames with timers and restart the pending one.
@@ -123,13 +122,12 @@ frame.addEventListener('load', async () => {
     current = 'after reset';
     const kept = Object.keys(localStorage).filter((k) => k.startsWith('ftlab:poly:') && k !== 'ftlab:poly:helpSeen');
     check(/cannot be undone/.test(confirmText), 'no warning in the reset prompt');
-    check(helpShown, 'help not shown after reset (first visit)');
     check(!kept.length, `still saved after reset: ${kept.join(', ')}`);
-    check(w.location.hash === '#' + app.challenges[0].id, `reopened at ${w.location.hash}`);
+    check(!w.location.hash && app.onLanding && !doc.querySelector('.landing').hidden, `reset did not open the intro page (${w.location.hash})`);
     check(!Object.keys(app.answers).length && /0\//.test(btn(/My answers/).textContent), 'answers survived the reset');
     check(app.state.stage === 'raw' && !app.state.touched && JSON.stringify(app.state.w) === JSON.stringify(app.challenges[0].start), 'challenge state survived the reset');
     check(!doc.querySelector('.dot.met'), 'goals reached survived the reset');
-    log.push(`reset lab: prompt shown, ${kept.length} keys left, back at ${w.location.hash}`);
+    log.push(`reset lab: prompt shown, ${kept.length} keys left, back on the intro page`);
     await finish();
     return;
   }
@@ -230,6 +228,20 @@ frame.addEventListener('load', async () => {
   check(app.state.stage === 'raw' && !app.state.revealed && doc.querySelector('.eqrow.fit').hidden, `reopened on ${app.state.stage}, revealed ${app.state.revealed}`);
   stageBtn('poly').click(); await sleep(80);
   check(app.state.w[3] === -0.7 && !app.state.revealed, 'polynomial weights not kept');
+
+  // intro page: three parts, one tile per challenge, Start button; a tile opens its challenge
+  current = 'intro';
+  w.location.hash = ''; await sleep(300);
+  const tiles = doc.querySelectorAll('.landing .tile');
+  check(app.onLanding && !doc.querySelector('.landing').hidden && doc.querySelector('.workspace').hidden, 'intro page not shown');
+  check(tiles.length === app.challenges.length && doc.querySelectorAll('.landing .wing').length === 3, `intro page has ${tiles.length} tiles`);
+  check(doc.querySelector('.landing .play').getAttribute('href') === '#' + app.challenges[0].id, 'start button does not open challenge 1');
+  check(doc.querySelectorAll('.landing .tile-done').length > 0, 'no done marks after submitting');
+  tiles[2].click(); await sleep(300);
+  check(!app.onLanding && w.location.hash === '#bullseye' && !doc.querySelector('.workspace').hidden, 'tile did not open its challenge');
+  const foot = doc.querySelector('footer.site-foot');
+  check(foot && foot.querySelector('a[href="https://kylebradbury.com/"]') && /Designed by Kyle Bradbury, built with Claude/.test(foot.textContent), 'no copyright footer');
+  log.push(`intro: ${tiles.length} tiles, done marks ${doc.querySelectorAll('.landing .tile-done').length}`);
 
   // next challenge button
   current = 'next';

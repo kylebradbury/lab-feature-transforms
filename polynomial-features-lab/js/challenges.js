@@ -255,3 +255,22 @@ export function fitToRange(w, frac = 0.8) {
   w.forEach((v, k) => { if (Math.abs(v) * s > frac * wMax(k)) s = (frac * wMax(k)) / Math.abs(v); });
   return w.map((v) => Math.round(v * s * 100) / 100);
 }
+
+// ---- intro page text ----------------------------------------------------
+
+export const LANDING = {
+  title: 'From x₁ and x₂ to polynomial features',
+  lead: 'Logistic regression draws its boundary where w₀ + w₁z₁ + w₂z₂ + … = 0. With only the raw inputs x₁ and x₂, that boundary is a straight line. In this lab you set the weights yourself, first on x₁ and x₂, then on polynomial terms such as x₁², x₁x₂ and x₁³, and watch the line become a circle, a parabola or an S-curve. Then you compare your answer with logistic regression’s best fit.',
+  steps: [
+    '<b>Set the weights by hand.</b> Drag the sliders to get the highest <b>training accuracy</b> you can. The equation at the top always shows the boundary you have drawn.',
+    '<b>Add polynomial features</b> when a line is not enough: degree 2 from challenge 3, degree 3 in the last two. The feature-space plot shows any two features against each other.',
+    '<b>Submit, then reveal the best fit.</b> Submitting records your answer in <i>My answers</i>; revealing shows logistic regression’s boundary, accuracy and weights next to yours.',
+  ],
+};
+
+// Challenge groups on the intro page.
+export const PARTS = [
+  { name: 'Part 1 · Straight lines', blurb: 'Raw features only. A line is all you need, if you can find the right one.', ids: ['blobs', 'overlap'] },
+  { name: 'Part 2 · Degree 2: circles, parabolas and hyperbolas', blurb: 'Squares and the product x₁x₂ let the boundary bend once.', ids: ['bullseye', 'parabola', 'xor', 'offcenter', 'moons'] },
+  { name: 'Part 3 · Degree 3 ★ extra challenging', blurb: 'Cubes let the boundary bend twice. Nine weights to balance by hand.', ids: ['scurve', 'moons3'] },
+];

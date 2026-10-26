@@ -45,7 +45,10 @@ MODULES.forEach((m, i) => {
 const nav = h('nav', { class: 'nav', 'aria-label': 'Modules' }, navList,
   h('div', { class: 'nav-foot', html: '● = core path for one class session.<br>Keys: <kbd>←</kbd><kbd>→</kbd> steps, <kbd>?</kbd> help.' }));
 const stage = h('main', { class: 'stage', id: 'stage' });
-document.getElementById('app').append(header, h('div', { class: 'layout' }, nav, stage));
+document.getElementById('app').append(header, h('div', { class: 'layout' }, nav, stage),
+  h('footer', { class: 'site-foot' },
+    '© 2026 ', h('a', { href: 'https://kylebradbury.com/', target: '_blank', rel: 'noopener' }, 'Kyle Bradbury'),
+    '. Designed by Kyle Bradbury, built with Claude.'));
 
 // ---------- routing ----------
 function parseHash() {

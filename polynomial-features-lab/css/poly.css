@@ -266,3 +266,48 @@ table.answers tr.missing td { color: var(--muted); }
 @media (min-width: 1100px) and (min-height: 600px) {
   body.poly { height: 100vh; height: 100dvh; overflow: hidden; }
 }
+
+/* ---------- copyright / credit (one slim line under the workspace) ---------- */
+.site-foot { text-align: center; color: var(--muted); font-size: 0.84em; padding: 4px 16px 6px; flex: none; border-top: 1px solid var(--border); }
+.site-foot a { color: var(--ink-2); }
+
+/* ---------- intro page (styled after the overfitting lab's landing page) ---------- */
+body.poly.on-landing { height: auto; overflow: visible; }
+.app-header a.brand { color: inherit; text-decoration: none; }
+.landing { flex: none; width: 100%; max-width: 1360px; margin: 0 auto; padding: 22px 24px 40px; }
+.landing .hero { margin-bottom: 18px; }
+.landing .hero h1 { font-size: clamp(1.9em, 3.2vw, 2.7em); line-height: 1.12; margin: 4px 0 10px; font-weight: 700; letter-spacing: -0.01em; }
+.landing .hero .lead { font-size: 1.12em; line-height: 1.55; max-width: 76ch; margin: 0 0 8px; color: var(--ink-2); }
+.landing .steps { margin: 6px 0 14px; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; max-width: 80ch; color: var(--ink-2); }
+.landing .steps b { color: var(--ink); }
+.landing .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.landing .hero-actions .play { padding: 7px 14px; font-weight: 650; min-width: 160px; text-decoration: none; text-align: center; }
+.landing .wing { margin-top: 26px; }
+.landing .wing h2 { font-size: 1.25em; margin: 0 0 2px; font-weight: 650; }
+.landing .wing .blurb { margin: 0 0 12px; color: var(--ink-2); max-width: 80ch; }
+.landing .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.landing .tile {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  text-decoration: none; color: inherit; overflow: hidden; transition: border-color 0.15s, transform 0.15s;
+}
+.landing .tile:hover, .landing .tile:focus-visible { border-color: var(--ink-2); transform: translateY(-2px); outline: none; }
+.landing .tile:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
+.landing .tile-plot .plot-box { aspect-ratio: 1 / 1; }
+.landing .tile-cap { padding: 8px 11px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.landing .tile-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 8px; }
+.landing .tile-top b { font-size: 1.06em; font-weight: 650; }
+.landing .fam { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); white-space: nowrap; font-weight: 600; }
+.landing .tile-lead { font-size: 0.86em; color: var(--ink-2); }
+.landing .tile-done { font-size: 0.84em; color: var(--good); font-weight: 600; }
+.landing .finale-link {
+  display: flex; flex-direction: column; gap: 3px; margin-top: 26px; padding: 14px 18px; width: 100%; text-align: left;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.landing .finale-link b { font-size: 1.25em; }
+.landing .finale-link span:last-child { color: var(--ink-2); }
+.landing .finale-link:hover { border-color: var(--ink-2); background: var(--wash); }
+@media (max-width: 760px) {
+  .landing { padding: 16px 16px 32px; }
+  .landing .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}

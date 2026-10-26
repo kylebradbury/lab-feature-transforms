@@ -1,0 +1,135 @@
+/* Overfitting Lab: station pages, charts, stepper and answers, on top of lab.css
+   and gallery.css (the shell, sticky stage and side column). Colors come from
+   css/themes/. The stepper, segmented controls, weight bars, feature chips and
+   the answers table are the polynomial lab's (css/poly.css). */
+
+body.ofl { min-height: 100vh; }
+body.ofl [hidden] { display: none !important; }
+body.ofl .app-header { box-shadow: inset 0 4px 0 var(--header-stripe); }
+
+/* ---------- from the polynomial lab ---------- */
+.stepper { display: flex; align-items: center; gap: 6px; margin-left: 18px; min-width: 0; }
+.stepper .btn { padding: 2px 9px; }
+.zchips { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 6px; }
+.zchip {
+  position: relative; border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
+  padding: 2px 10px; cursor: grab; font-size: 0.92em; touch-action: none; user-select: none;
+}
+.zchip:hover { background: var(--wash); border-color: var(--ink-2); }
+.zchip.off { border-style: dashed; color: var(--ink-2); }
+.zchip .ax { font-size: 0.75em; color: var(--muted); margin-left: 3px; }
+.zchip.ghost { position: fixed; z-index: 60; pointer-events: none; cursor: grabbing; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); transform: translate(-50%, -50%); }
+.zchip.ghost .to { margin-left: 6px; font-size: 0.75em; color: var(--ink-2); }
+.zchip.dragging { opacity: 0.4; }
+.drop-hint {
+  position: absolute; z-index: 4; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--fit) 18%, transparent); border: 2px dashed var(--fit); border-radius: 8px;
+  color: var(--ink); font-size: 0.85em; font-weight: 600;
+}
+.drop-hint.h { left: 0; right: 0; bottom: 0; height: 30%; }
+.drop-hint.v { left: 0; top: 0; bottom: 0; width: 30%; writing-mode: vertical-rl; transform: rotate(180deg); }
+.zmenu { position: absolute; z-index: 30; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
+.zcard { position: relative; }
+
+/* ---------- weights chart ---------- */
+.wbars { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.wbar-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 84px; gap: 6px; align-items: center; border-radius: 6px; padding: 1px 2px; }
+.wbar-row.hl { background: var(--hl); }
+.wbar-row .lab { text-align: right; white-space: nowrap; }
+.wbar-row .lab .nb { color: var(--ink-2); }
+.wbar-row .track { position: relative; height: 17px; }
+.wbar-row .track::before { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; border-left: 1px solid var(--axis); }
+.wbar-row .bar { position: absolute; border-radius: 2px; }
+.wbar-row .bar.you { top: 1px; height: 9px; }
+.wbar-row .bar.you.pos { background: var(--class1); }
+.wbar-row .bar.you.neg { background: var(--class0); }
+.wbar-row .bar.best { top: 10px; height: 6px; border: 1.5px solid var(--fit); background: color-mix(in srgb, var(--fit) 22%, transparent); }
+.wbar-row .val { display: flex; justify-content: flex-end; gap: 7px; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; font-size: 11.5px; }
+.wbar-row .val .bf { color: var(--fit); }
+.wbar-row.off { opacity: 0.45; }
+.wbars.many { gap: 0; }
+.wbars.many .wbar-row { padding-top: 0; padding-bottom: 0; line-height: 1.15; }
+.wbars.many .lab .katex { font-size: 0.92em; }
+.wbars.many .track { height: 14px; }
+.wbars.many .bar.you { height: 7px; }
+.wbars.many .bar.best { top: 8px; height: 5px; }
+.dots { display: flex; gap: 4px; }
+.dot {
+  width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface);
+  font-size: 0.78em; cursor: pointer; font-variant-numeric: tabular-nums; padding: 0; line-height: 1;
+}
+.dot:hover { background: var(--wash); }
+.dot.met { border-color: var(--good); color: var(--good); font-weight: 700; }
+.dot[aria-current="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin-bottom: 8px; }
+.seg button { border: 0; background: var(--surface); padding: 6px 8px; cursor: pointer; font-size: 0.88em; line-height: 1.25; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.icon-btn .count { font-variant-numeric: tabular-nums; }
+.modal .sheet.wide { width: min(1120px, 100%); }
+.ans-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; margin-bottom: 10px; }
+.ans-top input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); min-width: 220px; }
+.ans-wrap { overflow-x: auto; }
+table.answers { width: 100%; border-collapse: collapse; font-size: 0.88em; font-variant-numeric: tabular-nums; }
+table.answers th, table.answers td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.answers th { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+table.answers td.eq { white-space: nowrap; }
+table.answers td.met { color: var(--good); font-weight: 600; }
+table.answers tr.missing td { color: var(--muted); }
+
+/* ---------- legend swatches ---------- */
+.legend .sw.hollow { background: transparent; border: 2px solid var(--ink-2); border-radius: 50%; }
+.legend .sw.line.thin { height: 1.5px; vertical-align: 4px; opacity: 0.8; }
+.legend .sw.dashline { height: 0; width: 18px; background: none; border-top: 2px dashed var(--ink); vertical-align: 3px; }
+.legend .sw.ring { background: transparent; border: 1.5px solid var(--ink); border-radius: 50%; width: 12px; height: 12px; }
+.legend .sw.ring.dashed { border-style: dashed; }
+.chart-legend { margin-top: 0; }
+.chart-legend .sw.curve { height: 0; width: 22px; background: none; vertical-align: 3px; }
+.chart-legend .sw.curve.train { border-top: 2px dashed var(--ink-2); }
+.chart-legend .sw.curve.test { border-top: 2.5px solid var(--ink); }
+.chart-legend .sw.curve.best { border-top: 1.5px dotted var(--muted); }
+
+/* ---------- station page: plot and chart on the left, both in view ---------- */
+/* The stage (plot + chart) is sticky, so it must fit the screen: the plot gets what is left. */
+.station { --stage: max(240px, min(calc(100vh - 64px - 12px - 340px), calc(100vw - 36px - 16px - 26px - 430px))); }
+.station .ex-grid { grid-template-columns: auto minmax(380px, 620px); }
+.station .stage { min-width: 0; }
+.station .stage-wrap { margin: 0 auto; }
+.plot-title .ptitle .sub { color: var(--muted); font-size: 0.92em; }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; font-size: 0.84em; color: var(--ink-2); border-top: 1px solid var(--border); padding-top: 8px; }
+.chart-head b { color: var(--ink); font-weight: 600; }
+.chart-box.curve-box { height: 150px; }
+.chart-box.hist-box { height: 190px; }
+.stage .zchips { margin: -2px 0 2px; }
+
+/* ---------- side column ---------- */
+.predict .q-hint { margin: -2px 0 6px; }
+.predict .q { margin-top: 0; }
+.readouts .stat { flex: 1 1 128px; min-width: 0; }
+.readouts .stat .val.small { font-size: 1.05em; font-weight: 600; }
+.readouts .stat .note { font-size: 0.75em; color: var(--muted); }
+.readouts .stat.hidden-val .val { color: var(--muted); font-weight: 500; }
+.intuitions { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 0.9em; }
+.scores .hint { margin: 4px 0 0; }
+
+/* ---------- landing and wrap-up ---------- */
+.landing .tile-lead { font-size: 0.86em; color: var(--ink-2); }
+.landing .tiles { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.wrap .card { margin-top: 14px; max-width: 980px; }
+.wrap ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; }
+.wrap .levers + .hint { margin-top: 12px; }
+.exit-q { margin: 10px 0; }
+.exit-q label { display: block; margin-bottom: 4px; }
+
+@media (max-width: 860px) {
+  .station .ex-grid { grid-template-columns: minmax(0, 1fr); }
+  .station { --stage: calc(100vw - 52px); }
+}
+@media (max-width: 860px) and (min-height: 700px) {
+  .station { --stage: min(calc(100vw - 52px), 34vh); }
+  .chart-box.curve-box { height: 130px; }
+}
+@media (max-width: 700px) {
+  .stepper .dots { display: none; }
+}

@@ -1,0 +1,95 @@
+/* Polynomial Features Lab color theme: "brand" (green and dark gray).
+ *
+ * Every color in the lab comes from this file: page and text, the two classes
+ * (points, shaded regions, weight bars), the best-fit overlay, buttons and
+ * highlights. The class names used in on-screen text ("class 1 (green)") and
+ * the point shapes are set here too, so a theme switches as a whole.
+ *
+ * Switch themes: in index.html, change "brand" in the theme stylesheet link to
+ *   another file in css/themes/ (e.g. "classic", the original orange and blue),
+ *   or preview one without editing anything: index.html?theme=classic
+ * New theme: copy this file to css/themes/<name>.css, keep every variable, and
+ *   change the values. smoke.html checks the contrast rules noted below
+ *   (text ≥ 4.5:1, main text ≥ 7:1, class-0 points and lines ≥ 3:1 on both
+ *   regions; the class-1 outline is left to taste).
+ */
+
+/* ---------- light ---------- */
+:root {
+  color-scheme: light;
+
+  --brand-gray: #121619;
+  --brand-green: #00B050;
+
+  /* page and text (contrast on --surface) */
+  --surface: #FFFFFF;                   /* cards */
+  --page: #F2F3F4;                      /* background behind the cards */
+  --ink: var(--brand-gray);             /* main text, equation, boundary line (18:1) */
+  --ink-2: #3D4448;                     /* labels and headings (9.9:1) */
+  --muted: #5E666B;                     /* small hints (5.9:1) */
+  --grid: #E3E6E8;
+  --axis: #B9BFC3;
+  --border: rgba(18, 22, 25, 0.14);
+  --wash: rgba(18, 22, 25, 0.05);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  /* the two classes */
+  --class0-name: "gray";                /* used in on-screen text */
+  --class1-name: "green";
+  --class0: var(--brand-gray);          /* class-0 points, negative weight bars */
+  --class1: var(--brand-green);         /* class-1 points, positive weight bars */
+  --class0-shape: square;               /* square or circle */
+  --class1-shape: circle;
+  --class0-edge: #FFFFFF;               /* outline drawn around each point */
+  --class1-edge: #FFFFFF;               /* white outline, as in the slides (a style choice: #006B31 would give ≥ 4:1 on both regions) */
+  --point-edge-width: 2.2;              /* px */
+  --region0: #C9CDD0;                   /* shading where the model confidently predicts class 0 */
+  --region1: #D4F2DF;                   /* ... class 1; ≥ 10 lightness units from region0, also for color-blind viewers */
+  --heat-mid: #FFFFFF;                  /* 50/50 predictions, and areas no data can reach */
+
+  /* accents */
+  --fit: #0070C0;                       /* best fit: dashed line, bars, Reveal button (5.2:1) */
+  --primary: #007A3D;                   /* main buttons; deep brand green (#00B050 is only 2.9:1 as text) */
+  --on-primary: #FFFFFF;
+  --good: #007A3D;                      /* "goal reached" */
+  --bad: #C62828;
+  --hl: rgba(255, 192, 0, 0.3);         /* highlight behind the term being changed */
+  --header-stripe: var(--brand-green);    /* band along the top of the page */
+}
+
+/* ---------- dark (system setting, or the Theme button) ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface: #1B2024;
+  --page: var(--brand-gray);
+  --ink: #E9ECEE;                       /* 13.8:1 */
+  --ink-2: #C3C9CD;                     /* 9.8:1 */
+  --muted: #9AA3A9;                     /* 6.4:1 */
+  --grid: #2A3034;
+  --axis: #3D454A;
+  --border: rgba(255, 255, 255, 0.12);
+  --wash: rgba(255, 255, 255, 0.06);
+  --shadow: none;
+
+  --class0-name: "gray";
+  --class1-name: "green";
+  --class0: #D3D8DB;                    /* light gray: the dark gray would vanish here */
+  --class1: var(--brand-green);
+  --class0-shape: square;
+  --class1-shape: circle;
+  --class0-edge: #1B2024;
+  --class1-edge: var(--brand-green);
+  --point-edge-width: 1.5;
+  --region0: #262B2F;
+  --region1: #1A4D33;
+  --heat-mid: #1B2024;
+
+  --fit: #5AAEF0;
+  --primary: var(--brand-green);
+  --on-primary: var(--brand-gray);
+  --good: var(--brand-green);
+  --bad: #EF6B6B;
+  --hl: rgba(255, 192, 0, 0.22);
+  --header-stripe: var(--brand-green);
+}

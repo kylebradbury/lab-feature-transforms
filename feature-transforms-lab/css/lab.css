@@ -326,3 +326,7 @@ body.present details.card.why, body.present details.card.practice { display: non
 @media (prefers-reduced-motion: reduce) {
   .pill.busy { animation: none; }
 }
+
+/* ---------- copyright / credit ---------- */
+.site-foot { text-align: center; color: var(--muted); font-size: 0.84em; padding: 18px 16px 26px; border-top: 1px solid var(--border); }
+.site-foot a { color: var(--ink-2); }

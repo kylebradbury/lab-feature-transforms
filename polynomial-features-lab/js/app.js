@@ -5,7 +5,8 @@
 // a 2-D view of feature space with drag-and-drop axes, a relative-weights
 // chart, the controls, and the boundary equation pinned on top.
 
-import { CHALLENGES, TERMS, ALL, STAGES, SPLIT, LAMBDA, wMax, stageDeg, featuresFor, compress, bestFit, scoreWeights, equationText, fitToRange, mapRegions } from './challenges.js';
+import { CHALLENGES, TERMS, ALL, STAGES, SPLIT, LAMBDA, wMax, stageDeg, featuresFor, compress, bestFit, scoreWeights, equationText, fitToRange, mapRegions, splitFor, LANDING, PARTS } from './challenges.js';
+import { viewFor } from './fit.js';
 import { Scene, LIVE_SCENES } from './scene.js';
 import { XPlot, evalGrid, refreshTheme, theme, LIVE_PLOTS } from './plot2d.js';
 import { marchingSquares, chainSegments, classifyConic } from './geometry.js';
@@ -116,7 +117,7 @@ const answersCount = h('span', { class: 'count' });
 const answersBtn = h('button', { class: 'icon-btn', type: 'button', title: 'Your submitted answers, ready to copy or screenshot' }, '📋', h('span', { class: 'lbl' }, ' My answers'), ' ', answersCount);
 const resetLabBtn = h('button', { class: 'icon-btn', type: 'button', title: 'Erase all progress in this browser and start the lab over', 'aria-label': 'Reset lab' }, '↺', h('span', { class: 'lbl' }, ' Reset lab'));
 const header = h('header', { class: 'app-header' },
-  h('div', { class: 'brand' }, 'Polynomial Features Lab', h('small', {}, 'IDS 705 · from x₁, x₂ to polynomial features')),
+  h('a', { class: 'brand', href: '#', title: 'Overview of the exercises' }, 'Polynomial Features Lab', h('small', {}, 'IDS 705 · from x₁, x₂ to polynomial features')),
   h('nav', { class: 'stepper', 'aria-label': 'Challenges' }, prevBtn, dots, nextBtn),
   h('div', { class: 'spacer' }),
   answersBtn, resetLabBtn, themeBtn, helpBtn);
@@ -248,10 +249,15 @@ const insightEl = h('div', { class: 'insight' });
 const compare = h('section', { class: 'card compare', hidden: true }, h('h2', {}, 'You vs. the best fit'), compareBody, h('div', { class: 'btn-row' }, useBtn), insightEl);
 
 const midCol = h('div', { class: 'col mid' }, zcard, wcard);
-root.append(header, eqbar, h('main', { class: 'workspace' },
+const workspace = h('main', { class: 'workspace' },
   h('div', { class: 'col xcol' }, xcard),
   midCol,
-  h('div', { class: 'col side' }, chCard, modelCard, compare)));
+  h('div', { class: 'col side' }, chCard, modelCard, compare));
+const landing = h('main', { class: 'landing', hidden: true });
+root.append(header, eqbar, workspace, landing,
+  h('footer', { class: 'site-foot' },
+    '© 2026 ', h('a', { href: 'https://kylebradbury.com/', target: '_blank', rel: 'noopener' }, 'Kyle Bradbury'),
+    '. Designed by Kyle Bradbury, built with Claude.'));
 
 // ---------- plots + scene ----------
 
@@ -691,6 +697,7 @@ function syncChallenge() {
 }
 
 function switchTo(i) {
+  showWorkspace();
   i = clamp(i, 0, CHALLENGES.length - 1);
   if (i === idx) return;
   idx = i;
@@ -707,7 +714,66 @@ function switchTo(i) {
   syncActions();
   save();
 }
-window.addEventListener('hashchange', () => { const i = indexOf(location.hash.slice(1)); if (i >= 0) switchTo(i); });
+window.addEventListener('hashchange', () => {
+  const id = location.hash.slice(1), i = indexOf(id);
+  if (i >= 0) switchTo(i);
+  else if (!id) showLanding();
+});
+
+// ---------- intro page (no challenge in the address; the header title links here) ----------
+
+let onLanding = false, landingPlots = [];
+function showLanding() {
+  onLanding = true;
+  closeMenu();
+  document.body.classList.add('on-landing');
+  eqbar.hidden = workspace.hidden = true;
+  landing.hidden = false;
+  renderLanding();
+  window.scrollTo(0, 0);
+}
+function showWorkspace() {
+  if (!onLanding) return;
+  onLanding = false;
+  document.body.classList.remove('on-landing');
+  landing.hidden = true;
+  eqbar.hidden = workspace.hidden = false;
+  scene.invalidate('grid');
+  requestAnimationFrame(fitZ);
+}
+function renderLanding() {
+  landingPlots.forEach((pl) => pl.destroy());
+  landingPlots = [];
+  landing.replaceChildren(h('section', { class: 'hero' },
+    h('h1', {}, LANDING.title),
+    h('p', { class: 'lead', html: named(LANDING.lead) }),
+    h('ol', { class: 'steps', html: LANDING.steps.map((t) => `<li>${named(t)}</li>`).join('') }),
+    h('div', { class: 'hero-actions' }, h('a', { class: 'btn primary play', href: `#${CHALLENGES[0].id}` }, 'Start: challenge 1 →'))));
+  const DEG = ['', 'raw features', 'degree 2', 'degree 3'];
+  for (const part of PARTS) {
+    const grid = h('div', { class: 'tiles' });
+    for (const id of part.ids) {
+      const i = indexOf(id), c = CHALLENGES[i], p = progress[id], box = h('div', { class: 'plot-box' });
+      const met = !!(p && p.best != null && p.best >= c.goal - 1e-9);
+      const marks = [met ? '✓ goal reached' : null, answers[id] ? 'submitted' : null].filter(Boolean).join(' · ');
+      grid.append(h('a', { class: 'tile', href: `#${id}` }, h('div', { class: 'tile-plot' }, box),
+        h('div', { class: 'tile-cap' },
+          h('div', { class: 'tile-top' }, h('b', {}, `${i + 1}. ${c.name}`), c.hard ? h('span', { class: 'fam' }, '★ extra challenging') : null),
+          h('div', { class: 'tile-lead' }, `Goal ≥ ${goalPct(c.goal)} training accuracy · ${DEG[c.need]}`),
+          marks ? h('div', { class: 'tile-done' }, marks) : null)));
+      const plot = new XPlot(box, { thumb: true }), tr = splitFor(c).train;
+      plot.setView(viewFor(c.ds));
+      plot.render({ grid: null, points: [{ X: tr.X, y: tr.y, name: 'training' }] });
+      landingPlots.push(plot);
+    }
+    landing.append(h('section', { class: 'wing' }, h('h2', {}, part.name), h('p', { class: 'blurb' }, part.blurb), grid));
+  }
+  const fin = h('button', { class: 'finale-link card', type: 'button' },
+    h('span', { class: 'kicker' }, 'At the end'), h('b', {}, '📋 My answers'), h('span', {}, 'Every answer you submitted in one table, ready to copy or screenshot →'));
+  fin.addEventListener('click', showAnswers);
+  landing.append(fin);
+  renderMath(landing);
+}
 
 revealBtn.addEventListener('click', () => {
   S.revealed = !S.revealed;
@@ -959,16 +1025,16 @@ oneScreen.addEventListener('change', fitZ);
 
 // ---------- boot ----------
 
-if (location.hash.slice(1) !== ch().id) history.replaceState(null, '', `#${ch().id}`);
 syncChallenge();
 syncControls();
 syncZControls();
 syncActions();
 syncAnswers();
-if (!store('poly:helpSeen')) { store('poly:helpSeen', true); showHelp(); }
+// A challenge in the address opens it; otherwise start on the intro page.
+if (indexOf(location.hash.slice(1)) < 0) showLanding();
 
 // for the console and tests
 window.polylab = {
   scene, zplot, challenges: CHALLENGES, answers, get state() { return S; }, get zDrawn() { return zc.drawn; },
-  switchTo, setWeight, setStage, setInclude, assignAxis, showAnswers, fitZ,
+  switchTo, setWeight, setStage, setInclude, assignAxis, showAnswers, fitZ, get onLanding() { return onLanding; },
 };
